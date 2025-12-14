@@ -63,10 +63,10 @@ worker:
     temperature: 1.0
     top_p: 1.0
     limit_images: 0
-    gpu_memory_utilization: 0.6
+    gpu_memory_utilization: 0.8
     enforce_eager: false
     enable_chunked_prefill: false
-    tensor_parallel_size: 2
+    tensor_parallel_size: 1
     disable_tqdm: false
     val_override_config:
       temperature: 0.6
@@ -85,13 +85,13 @@ worker:
     reward_function: ./examples/reward_function/math.py:compute_score
 
 trainer:
-  total_epochs: 15
+  total_epochs: 200
   max_steps: null
   project_name: easy_r1
   experiment_name: qwen2_5_7b_math_grpo
-  logger: ["file", "wandb"]
+  logger: ["file", "swanlab"]
   nnodes: 1
-  n_gpus_per_node: 8
+  n_gpus_per_node: 4
   max_try_make_batch: 20  # -1 means no limit
   val_freq: 5  # -1 to disable
   val_before_train: true

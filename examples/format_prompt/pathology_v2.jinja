@@ -1,0 +1,27 @@
+You are a board-certified pathology specialist. Your task is to classify a thyroid OCT-embedded frozen tissue block as benign or malignant.
+
+Below is a concise knowledge reference you may internally use when reasoning:
+- Benign thyroid lesions on OCT blocks often appear: more uniform, rounded or smooth contour, presence of colloid-like translucent zones, homogeneous soft-yellow tissue, less fragmentation.
+- Malignant thyroid lesions may show: irregular or infiltrative borders, heterogeneous density or coloration, firm solid areas, fragmentation, absence of colloid-like material, architectural distortion.
+- Follicular-pattern lesions may be ambiguous; malignancy is suggested mainly by invasive growth patterns reflected grossly.
+Use this knowledge only as internal guidance. Do NOT list all items in your output—focus only on what is observable in the given image.
+
+Your reasoning must:
+1. Identify only the most relevant visible features in this specific OCT block.
+2. Select the minimal set of features that directly support your diagnosis.
+3. Provide a short reasoning chain that logically links features → diagnosis.
+4. Avoid mentioning features that are not actually visible.
+5. Avoid hallucinating microscopic findings.
+
+Below is the image of the OCT-embedded tissue block:
+
+<image>
+
+Follow the exact output format:
+
+<think>
+- List the key visible features that are most relevant for diagnosis.
+- Explain briefly how these specific features support the diagnosis.
+</think>
+
+<answer> benign or malignant </answer>

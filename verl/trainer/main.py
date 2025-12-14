@@ -110,9 +110,13 @@ def main():
                 "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:False",
                 "CUDA_DEVICE_MAX_CONNECTIONS": "1",
                 "VLLM_ALLREDUCE_USE_SYMM_MEM": "0",
+                "VLLM_USE_V1": "0",
+                "working_dir": "/tmp/shared-storage/lishichao/EasyR1/"
             }
         }
-        ray.init(runtime_env=runtime_env)
+        # For debugging, run Ray in a single process. This allows breakpoints to work.
+        # Set local_mode=False for actual training.
+        # ray.init(local_mode=True, runtime_env=runtime_env)
 
     runner = Runner.remote()
     ray.get(runner.run.remote(ppo_config))

@@ -1,27 +1,31 @@
 import re
-from typing import Any, List
+from typing import Any, List, Tuple
 
-REWARD_NAME = "pathology_answer_confidence_v2_2"
+REWARD_NAME = "isic_answer_confidence_v2_3"
 REWARD_TYPE = "batch"
 
-# Phrases that indicate the model is not committing to a label.
 AMBIGUOUS = [
     r"uncertain",
     r"unsure",
     r"cannot\s+determine",
     r"cannot\s+rule\s+out",
     r"indeterminate",
-    r"need\s+biopsy",
-    r"need\s+histopath",
     r"not\s+sure",
-    r"further\s+exam",
 ]
 
-# Linear aggressive reward parameters.
-ALPHA = 0.5
+ALPHA = 1.5
 BETA = 0.5
-LAMBDA = 2.0
-ANSWER_COST = 0.1
+LAMBDA = 3.0
+ANSWER_COST = 0.0
+FORMAT_WEIGHT = 0.1
+
+
+def _normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower())
+
+
+def _normalize_answer(text: str) -> str:
+    return re.sub(r"[\s\.,;:]+$", "", _normalize(text))
 
 
 def _is_ambiguous(text: str) -> bool:
@@ -29,20 +33,30 @@ def _is_ambiguous(text: str) -> bool:
     return any(re.search(pat, t) for pat in AMBIGUOUS)
 
 
-def _extract_label(text: str) -> str:
-    t = text.lower()
-    m = re.search(r"<answer>\s*(malignant|benign|unsure)\s*</answer>", t)
-    if m:
-        return m.group(1)
-    m = re.search(r"answer\s*[:=]\s*(malignant|benign|unsure)", t)
-    if m:
-        return m.group(1)
-    return "unknown"
+def _extract_answer_text(text: str) -> str:
+    match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return text.strip()
 
 
-def _extract_confidence(text: str) -> tuple[float, bool]:
-    """Return (confidence, missing_flag). missing_flag=True when confidence tag absent or unparsable."""
+def _has_option_prefix(text: str) -> bool:
+    return bool(re.match(r"^\s*[abcd](?:\s*[\).:\-])?\s+", text.strip(), re.IGNORECASE))
 
+
+def _format_score(text: str) -> float:
+    pattern = re.compile(r"<think>.*?</think>\s*<answer>.*?</answer>", re.DOTALL | re.IGNORECASE)
+    if not re.fullmatch(pattern, text):
+        return 0.0
+    answer_text = _extract_answer_text(text)
+    return 0.0 if _has_option_prefix(answer_text) else 1.0
+
+
+def _strip_option_prefix(text: str) -> str:
+    return re.sub(r"^\s*[abcd](?:\s*[\).:\-])?\s+", "", text.strip(), flags=re.IGNORECASE)
+
+
+def _extract_confidence(text: str) -> Tuple[float, bool]:
     def _clamp(val: float) -> float:
         return max(0.0, min(1.0, val))
 
@@ -52,35 +66,40 @@ def _extract_confidence(text: str) -> tuple[float, bool]:
         m = re.search(r"confidence\s*[:=]\s*([0-9]*\.?[0-9]+)%?", t)
     if not m:
         return 0.0, True
-
     try:
         val = float(m.group(1))
     except ValueError:
         return 0.0, True
-
-    # Allow percent-style confidence values.
     if val > 1.0:
         val /= 100.0
     return _clamp(val), False
 
 
+def _ground_truth_text(ground_truth: Any) -> str:
+    if isinstance(ground_truth, dict):
+        return str(ground_truth.get("label", "")).strip()
+    return str(ground_truth).strip()
+
+
 def compute_score(reward_inputs: List[dict[str, Any]]) -> List[dict[str, float]]:
-    # First pass: compute per-sample reward components and aggregate stats.
-    interim: list[dict[str, Any]] = []
+    interim: List[dict[str, Any]] = []
     total = len(reward_inputs)
     unsure_count = 0
     answered_count = 0
     correct_answered = 0
-
     for item in reward_inputs:
         resp = item["response"]
         gt = item["ground_truth"]
-        label = gt["label"] if isinstance(gt, dict) else str(gt)
-        label = str(label).lower()
+        gt_text = _ground_truth_text(gt)
 
         ambiguous = _is_ambiguous(resp)
-        pred_label = _extract_label(resp)
-        is_unsure = ambiguous or pred_label in {"unsure", "unknown"}
+        format_score = _format_score(resp)
+        pred_text = _extract_answer_text(resp)
+        pred_text_for_match = _strip_option_prefix(pred_text)
+        pred_norm = _normalize_answer(pred_text_for_match)
+        gt_norm = _normalize_answer(gt_text)
+        is_unsure = ambiguous or not pred_norm or not gt_norm
+
         pred_conf, missing_conf = (0.0, True) if is_unsure else _extract_confidence(resp)
 
         if is_unsure:
@@ -89,13 +108,15 @@ def compute_score(reward_inputs: List[dict[str, Any]]) -> List[dict[str, float]]
             acc = 0.0
         else:
             answered_count += 1
-            if pred_label == label:
+            if pred_norm == gt_norm:
                 correct_answered += 1
                 r_correct = ALPHA + BETA * pred_conf - ANSWER_COST
                 acc = 1.0
             else:
                 r_correct = -LAMBDA * pred_conf - ANSWER_COST
                 acc = 0.0
+
+        r_correct += FORMAT_WEIGHT * format_score
 
         interim.append(
             {
@@ -107,6 +128,7 @@ def compute_score(reward_inputs: List[dict[str, Any]]) -> List[dict[str, float]]
                 "confidence": float(pred_conf),
                 "answered": float(0.0 if is_unsure else 1.0),
                 "confidence_missing": float(1.0 if missing_conf else 0.0),
+                "format": float(format_score),
             }
         )
 
@@ -114,7 +136,6 @@ def compute_score(reward_inputs: List[dict[str, Any]]) -> List[dict[str, float]]
     unsure_rate = (unsure_count / total) if total else 0.0
     selective_acc = (correct_answered / answered_count) if answered_count else 0.0
 
-    # Second pass: attach aggregate metrics to each sample record.
     scores: List[dict[str, float]] = []
     for rec in interim:
         rec["coverage"] = float(coverage)

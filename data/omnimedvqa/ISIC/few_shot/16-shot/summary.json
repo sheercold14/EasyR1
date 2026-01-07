@@ -1,0 +1,9 @@
+{
+  "train_total": 160,
+  "train_written": 160,
+  "train_missing_images": 0,
+  "test_total": 552,
+  "test_written": 552,
+  "test_missing_images": 0,
+  "output_dir": "/tmp/shared-storage/lishichao/EasyR1/data/omnimedvqa/ISIC/few_shot/16-shot"
+}

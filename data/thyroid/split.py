@@ -16,7 +16,7 @@ def split_dataset(input_file, train_file, val_file):
         split_value = data.get('split')
         
         # split=3和split=4作为验证集，其余作为训练集
-        if split_value in ['3', '4']:
+        if split_value in ['3']:
             val_lines.append(line)
         else:
             train_lines.append(line)
@@ -36,7 +36,7 @@ def split_dataset(input_file, train_file, val_file):
 
 # 使用示例
 input_file = '/tmp/shared-storage/lishichao/EasyR1/data/thyroid/all.jsonl'
-train_file = '/tmp/shared-storage/lishichao/EasyR1/data/thyroid/train.jsonl'
-val_file = '/tmp/shared-storage/lishichao/EasyR1/data/thyroid/val.jsonl'
+train_file = '/tmp/shared-storage/lishichao/EasyR1/data/thyroid/folds/3/train.jsonl'
+val_file = '/tmp/shared-storage/lishichao/EasyR1/data/thyroid/folds/3/val.jsonl'
 
 split_dataset(input_file, train_file, val_file)

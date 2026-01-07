@@ -120,7 +120,6 @@ class RLHFDataset(Dataset):
         self.truncation = truncation
         self.min_pixels = min_pixels
         self.max_pixels = max_pixels
-
         if "@" in data_path:
             data_path, data_split = data_path.split("@")
         else:

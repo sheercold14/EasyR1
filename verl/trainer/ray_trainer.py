@@ -683,6 +683,16 @@ class RayPPOTrainer:
             metrics.update(compute_data_metrics(batch=batch, use_critic=self.use_critic))
             metrics.update(compute_timing_metrics(batch=batch, timing_raw=timing_raw))
             metrics.update(compute_throughout_metrics(batch=batch, timing_raw=timing_raw, num_gpus=num_gpus))
+            dataset = getattr(self.train_dataloader, "dataset", None)
+            if dataset is not None and hasattr(dataset, "get_drop_stats"):
+                drop_stats = dataset.get_drop_stats()
+                metrics.update(
+                    {
+                        "data/online_dropped_overlong": drop_stats["dropped_overlong"],
+                        "data/online_total_seen": drop_stats["total_seen"],
+                        "data/online_drop_rate": drop_stats["drop_rate"],
+                    }
+                )
 
             self.logger.log(data=metrics, step=self.global_step)
             main_tqdm.update()

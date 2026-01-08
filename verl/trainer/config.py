@@ -55,6 +55,8 @@ class DataConfig:
     max_pixels: Optional[int] = 4194304
     filter_overlong_prompts: bool = True
     filter_overlong_prompts_workers: int = 16
+    oracle_redis_url: str = ""
+    oracle_queue_key: str = "oracle_queue"
 
     def post_init(self):
         self.image_dir = get_abs_path(self.image_dir, prompt="Image directory")

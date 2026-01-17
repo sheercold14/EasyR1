@@ -1,0 +1,109 @@
+data:
+  train_files: /data/shichao/EasyR1/data/thyroid/train.jsonl
+  val_files: /data/shichao/EasyR1/data/thyroid/val.jsonl
+  prompt_key: prompt
+  answer_key: answer
+  image_key: images
+  video_key: videos
+  image_dir: /data/shichao/hospital3/hospital3_thyroid_merged
+  video_fps: 2.0
+  max_prompt_length: 2048
+  max_response_length: 2048
+  rollout_batch_size: 32
+  mini_rollout_batch_size: null
+  val_batch_size: 16
+  format_prompt: Comparative-R1/prompts/comparative.jinja
+  override_chat_template: null
+  shuffle: true
+  seed: 42
+  min_pixels: 262144
+  max_pixels: 1003520   # <--- 修改这里：从 4194304 降为 1048576 (1024x1024)   
+  filter_overlong_prompts: false
+
+algorithm:
+  adv_estimator: grpo
+  disable_kl: true
+  use_kl_loss: false
+  kl_penalty: low_var_kl
+  kl_coef: 0.0
+  online_filtering: false
+  filter_key: overall
+  filter_low: 0.01
+  filter_high: 0.99
+
+worker:
+  actor:
+    loss_type: gspo_token
+    loss_avg_mode: seq
+    clip_ratio_low: 3e-4
+    clip_ratio_high: 4e-4
+    global_batch_size: 32
+    micro_batch_size_per_device_for_update: 1
+    micro_batch_size_per_device_for_experience: 2
+    max_grad_norm: 1.0
+    padding_free: true
+    dynamic_batching: true
+    ulysses_size: 1
+    model:
+      model_path: /data/shichao/models/Qwen3-VL-2B-Instruct
+      enable_gradient_checkpointing: true
+      trust_remote_code: true
+      freeze_vision_tower: false
+    optim:
+      lr: 1.0e-6
+      weight_decay: 1.0e-2
+      strategy: adamw
+      lr_warmup_ratio: 0.0
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: true
+      offload_optimizer: true
+
+  rollout:
+    n: 2
+    temperature: 0.7
+    top_p: 0.9
+    limit_images: 4  # Support up to 4 images per sample
+    gpu_memory_utilization: 0.6
+    enforce_eager: false
+    enable_chunked_prefill: false
+    tensor_parallel_size: 1
+    disable_tqdm: false
+    val_override_config:
+      temperature: 0.6
+      top_p: 0.95
+      n: 1
+
+  ref:
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: true
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+
+  reward:
+    reward_function: Comparative-R1/reward/comparative_reward.py:compute_score
+
+trainer:
+  total_epochs: 200
+  max_steps: null
+  project_name: comparative_r1
+  experiment_name: thyroid_comparative_gspo
+  logger: ["file", "swanlab"]
+  nnodes: 1
+  n_gpus_per_node: 4
+  max_try_make_batch: 20
+  val_freq: 5
+  val_before_train: false
+  val_only: false
+  val_generations_to_log: 6
+  save_freq: 5
+  save_limit: 1  # Keep latest + best
+  save_model_only: false
+  save_checkpoint_path: null
+  load_checkpoint_path: null
+  find_last_checkpoint: true

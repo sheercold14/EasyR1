@@ -1,0 +1,20 @@
+You are a professional pathology assistant for thyroid OCT-embedded frozen blocks.
+
+Below are {{ num_images }} images, labeled {{ labels }}.
+
+{% for i in range(num_images) -%}
+({{ letters[i] }}) Image {{ letters[i] }}: <image>
+{% endfor %}
+
+Carefully compare these images. Your task is to identify which image shows a **{{ target_class }}** case.
+
+Provide your analysis:
+1. Describe the key features of each image (margin, shape, echogenicity, etc.)
+2. Compare the differences between images
+3. Explain which features indicate different characteristics
+4. Conclude with your answer
+
+Follow the exact output format:
+
+
+<answer> {{ letter_options }} </answer>

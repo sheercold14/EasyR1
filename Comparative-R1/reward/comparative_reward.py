@@ -160,13 +160,23 @@ def compute_score_comparative(response: str, ground_truth: dict) -> dict[str, An
         response: Model's response text
         ground_truth: Contains 'target_class', 'correct_answer', 'labels', 'num_images'
     """
-    correct_answer = ground_truth.get("correct_answer", "A").upper()
-    target_class = ground_truth.get("target_class", "")
+    correct_answer_raw = ground_truth.get("correct_answer", "A")
+    if not isinstance(correct_answer_raw, str) or not correct_answer_raw.strip():
+        correct_answer = "A"
+        has_valid_label = False
+    else:
+        correct_answer = correct_answer_raw.strip().upper()
+        has_valid_label = True
+
+    target_class = ground_truth.get("target_class", "") or ""
 
     predicted_answer = _extract_comparative_answer(response, correct_answer)
 
     # Correctness score
-    if predicted_answer == "UNKNOWN":
+    if not has_valid_label:
+        r_correct = -0.5
+        acc = 0.0
+    elif predicted_answer == "UNKNOWN":
         r_correct = -0.5
         acc = 0.0
     elif predicted_answer == correct_answer:
@@ -216,7 +226,13 @@ def compute_score(reward_inputs: List[dict[str, Any]]) -> List[dict[str, float]]
             ground_truth = {"label": str(ground_truth)}
 
         task_type = ground_truth.get("task_type", None)
-        is_comparative = task_type == "comparative" or "correct_answer" in ground_truth
+        if task_type == "comparative":
+            is_comparative = True
+        elif task_type == "single":
+            is_comparative = False
+        else:
+            correct_answer_raw = ground_truth.get("correct_answer", None)
+            is_comparative = isinstance(correct_answer_raw, str) and bool(correct_answer_raw.strip())
 
         if is_comparative:
             result = compute_score_comparative(response, ground_truth)

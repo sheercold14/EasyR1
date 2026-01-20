@@ -69,11 +69,10 @@ Follow the exact output format:
 <answer> benign or malignant </answer>"""
 
     return {
-        "task_type": "single",
         "prompt": prompt,
         "images": [image_path],  # Always array for consistent type
         "label": sample["label"],
-        "answer": {"label": sample["label"]},  # For dataset compatibility
+        "answer": {"task_type": "single", "label": sample["label"]},  # For dataset compatibility
         "split": sample["split"],
     }
 
@@ -107,10 +106,7 @@ def generate_comparative_sample(
     target_idx = all_samples.index(target)
     correct_answer = chr(ord("A") + target_idx)
 
-    # Generate labels string
-    labels = [s["label"] for s in all_samples]
     letters = [chr(ord("A") + i) for i in range(num_images)]
-    labels_str = ", ".join([f"({letters[i]}) {labels[i]}" for i in range(num_images)])
 
     # Build image placeholders
     image_placeholders = "\n".join([f"({letters[i]}) Image {letters[i]}: <image>" for i in range(num_images)])
@@ -118,7 +114,7 @@ def generate_comparative_sample(
     # Generate prompt with multiple <image> placeholders
     prompt = f"""You are a professional pathology assistant for thyroid OCT-embedded frozen blocks.
 
-Below are {num_images} images, labeled {labels_str}.
+Below are {num_images} images, labeled {', '.join(letters)}.
 
 {image_placeholders}
 
@@ -142,10 +138,11 @@ Follow the exact output format:
         "task_type": "comparative",
         "prompt": prompt,
         "images": [img for sample in all_samples for img in sample["images"]],
-        "labels": labels,
-        "target_class": target_class,
-        "correct_answer": correct_answer,
-        "answer": {"correct_answer": correct_answer, "target_class": target_class},  # For dataset compatibility
+        "answer": {  # For dataset compatibility
+            "task_type": "comparative",
+            "correct_answer": correct_answer,
+            "target_class": target_class,
+        },
         "split": split,
     }
 

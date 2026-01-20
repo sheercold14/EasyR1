@@ -79,7 +79,7 @@ Follow the exact output format:
     return {
         "prompt": prompt,
         "images": [filename],  # Only filename, not full path
-        "answer": {"label": sample["label"]},
+        "answer": {"task_type": "single", "label": sample["label"]},
         "split": sample["split"],
     }
 
@@ -113,10 +113,7 @@ def generate_comparative_sample(
     target_idx = all_samples.index(target)
     correct_answer = chr(ord("A") + target_idx)
 
-    # Generate labels string
-    labels = [s["label"] for s in all_samples]
     letters = [chr(ord("A") + i) for i in range(num_images)]
-    labels_str = ", ".join([f"({letters[i]}) {labels[i]}" for i in range(num_images)])
 
     # Build image placeholders
     image_placeholders = "\n".join([f"({letters[i]}) Image {letters[i]}: <image>" for i in range(num_images)])
@@ -124,7 +121,7 @@ def generate_comparative_sample(
     # Generate fully rendered prompt (all variables embedded)
     prompt = f"""You are a professional pathology assistant for thyroid OCT-embedded frozen blocks.
 
-Below are {num_images} images, labeled {labels_str}.
+Below are {num_images} images, labeled {', '.join(letters)}.
 
 {image_placeholders}
 
@@ -150,10 +147,11 @@ Follow the exact output format:
     return {
         "prompt": prompt,
         "images": filenames,  # Only filenames, not full paths
-        "labels": labels,
-        "target_class": target_class,
-        "correct_answer": correct_answer,
-        "answer": {"correct_answer": correct_answer, "target_class": target_class},
+        "answer": {
+            "task_type": "comparative",
+            "correct_answer": correct_answer,
+            "target_class": target_class,
+        },
         "split": split,
     }
 

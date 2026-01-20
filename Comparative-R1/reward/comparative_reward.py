@@ -14,6 +14,8 @@ from typing import Any, List
 REWARD_NAME = "thyroid_jinja_mixed"
 REWARD_TYPE = "batch"
 
+STRUCTURE_WEIGHT = 0.0
+
 
 def _extract_single_image_label(text: str, class_names: List[str]) -> str:
     """Extract the classification label from single-image response."""
@@ -114,34 +116,6 @@ def _structure_score(text: str) -> float:
 
     return min(score, 0.5)
 
-
-def _reasoning_quality_score(text: str) -> float:
-    """Reward for medical reasoning quality."""
-    score = 0.0
-    t = text.lower()
-
-    # Medical feature keywords
-    feature_keywords = [
-        "margin", "border", "shape", "echogenicity",
-        "calcification", "cystic", "solid", "halo",
-        "taller than wide", "irregular", "well-defined",
-    ]
-
-    mentioned_features = sum(1 for kw in feature_keywords if kw in t)
-    score += min(mentioned_features * 0.1, 0.5)
-
-    # Comparative reasoning (mentions both classes)
-    if "benign" in t and "malignant" in t:
-        score += 0.2
-
-    # Explanation phrases
-    explanation_phrases = ["indicate", "suggest", "consistent with", "characteristic", "shows"]
-    if any(phrase in t for phrase in explanation_phrases):
-        score += 0.1
-
-    return min(score, 0.8)
-
-
 def compute_score_single(response: str, ground_truth: dict) -> dict[str, Any]:
     """
     Compute reward for single-image classification task.
@@ -157,20 +131,22 @@ def compute_score_single(response: str, ground_truth: dict) -> dict[str, Any]:
     # Correctness score
     if predicted_label == "unknown":
         r_correct = -0.5
+        acc = 0.0
     elif predicted_label == true_label:
         r_correct = 2.0
+        acc = 1.0
     else:
         r_correct = -1.5
+        acc = 0.0
 
     r_struct = _structure_score(response)
-    r_reason = _reasoning_quality_score(response)
-    total_score = r_correct + r_struct + r_reason
+    total_score = r_correct + STRUCTURE_WEIGHT * r_struct
 
     return {
         "overall": float(total_score),
         "correct": float(r_correct),
         "structure": float(r_struct),
-        "reasoning": float(r_reason),
+        "acc": float(acc),
         "predicted": predicted_label,
         "correct_answer": true_label,
     }
@@ -192,20 +168,22 @@ def compute_score_comparative(response: str, ground_truth: dict) -> dict[str, An
     # Correctness score
     if predicted_answer == "UNKNOWN":
         r_correct = -0.5
+        acc = 0.0
     elif predicted_answer == correct_answer:
         r_correct = 2.0
+        acc = 1.0
     else:
         r_correct = -1.5
+        acc = 0.0
 
     r_struct = _structure_score(response)
-    r_reason = _reasoning_quality_score(response)
-    total_score = r_correct + r_struct + r_reason
+    total_score = r_correct + STRUCTURE_WEIGHT * r_struct
 
     return {
         "overall": float(total_score),
         "correct": float(r_correct),
         "structure": float(r_struct),
-        "reasoning": float(r_reason),
+        "acc": float(acc),
         "predicted": predicted_answer,
         "correct_answer": correct_answer,
         "target_class": target_class,
@@ -234,21 +212,19 @@ def compute_score(reward_inputs: List[dict[str, Any]]) -> List[dict[str, float]]
         response = item["response"]
         ground_truth = item["ground_truth"]
 
-        # Detect task type - check for multiple images or task_type marker
-        num_images = len(ground_truth.get("images", []))
-        has_task_type = "task_type" in ground_truth
+        if not isinstance(ground_truth, dict):
+            ground_truth = {"label": str(ground_truth)}
 
-        if num_images > 1 or (has_task_type and ground_truth["task_type"] == "comparative"):
+        task_type = ground_truth.get("task_type", None)
+        is_comparative = task_type == "comparative" or "correct_answer" in ground_truth
+
+        if is_comparative:
             result = compute_score_comparative(response, ground_truth)
         else:
             result = compute_score_single(response, ground_truth)
 
         # Add task_type for tracking (but will be filtered out below)
-        if "task_type" not in ground_truth:
-            # Infer from number of images
-            result["task_type"] = "comparative" if num_images > 1 else "single"
-        else:
-            result["task_type"] = ground_truth.get("task_type", "single")
+        result["task_type"] = "comparative" if is_comparative else "single"
 
         # Filter to ONLY numeric values for metrics aggregation
         # Remove string keys: 'predicted', 'correct_answer', 'target_class', 'task_type'

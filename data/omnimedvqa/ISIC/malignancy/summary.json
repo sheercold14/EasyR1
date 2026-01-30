@@ -1,0 +1,32 @@
+{
+  "train": {
+    "total": 968,
+    "labels": {
+      "Benign image.": 895,
+      "Malignant": 73
+    },
+    "num_options": {
+      "2": 968
+    },
+    "datasets": {
+      "ISIC2020": 968
+    }
+  },
+  "val": {
+    "total": 244,
+    "labels": {
+      "Benign image.": 212,
+      "Malignant": 32
+    },
+    "num_options": {
+      "2": 244
+    },
+    "datasets": {
+      "ISIC2020": 244
+    }
+  },
+  "unknown_bucket_counts": {
+    "train": {},
+    "val": {}
+  }
+}

@@ -1,0 +1,83 @@
+# OminiExpert: OmniMedVQA Benchmark Builder + Comparative-RFT (B1–B7)
+
+This folder contains a small dataset construction engine for turning **OmniMedVQA** JSON files into **EasyR1**-style `jsonl` training data, plus a generator for the **multi-image contrastive task suite (B1–B7)**.
+
+## Script
+
+- `EasyR1/scripts/OminiExpert/omnimed_expert.py`
+
+Default paths assume this repo layout:
+
+- OmniMedVQA root: `data/OmniMedVQA`
+- Output root (suggested): `data/OminiMedExpert`
+
+You can override with `--omni_root ...`.
+
+## 1) List available datasets
+
+```bash
+python EasyR1/scripts/OminiExpert/omnimed_expert.py list
+```
+
+Dataset names correspond to `QA_information/*/*.json` **file stems** (e.g., `ISIC2018` for `ISIC2018.json`).
+
+## 2) Inspect question_type / modality_type distributions
+
+```bash
+python EasyR1/scripts/OminiExpert/omnimed_expert.py inspect --datasets ISIC2018 ISIC2019 ISIC2020
+```
+
+## 3) Build base VQA-style JSONL + split + few-shot (steps 1–5)
+
+Example: merge ISIC2018-2020, keep only `Disease Diagnosis`, split into train/val/test, and build a few-shot subset from train.
+
+```bash
+python EasyR1/scripts/OminiExpert/omnimed_expert.py build-base \
+  --datasets ISIC2018 ISIC2019 ISIC2020 \
+  --question-type "Disease Diagnosis" \
+  --min-option-count 4 --max-option-count 4 \
+  --split 0.8,0.1,0.1 \
+  --seed 42 \
+  --skip-missing-images \
+  --fewshot-ratio 0.05 \
+  --out-dir data/OminiMedExpert/isic2018_2020_disease_diagnosis
+```
+
+Outputs:
+
+- `data/OminiMedExpert/isic2018_2020_disease_diagnosis/train.jsonl`
+- `data/OminiMedExpert/isic2018_2020_disease_diagnosis/val.jsonl`
+- `data/OminiMedExpert/isic2018_2020_disease_diagnosis/test.jsonl`
+- `data/OminiMedExpert/isic2018_2020_disease_diagnosis/train_fewshot_0.05.jsonl` (if enabled)
+- `data/OminiMedExpert/isic2018_2020_disease_diagnosis/summary.json`
+
+### Notes on leakage-aware splitting
+
+The builder writes `answer.group_id` and splits by this key:
+
+1. If the raw JSON contains patient/subject/case-like fields (`patient_id`, `subject_id`, `case_id`, ...), it uses them.
+2. Else, it groups by **3D-slice prefix** naming convention (`{ori}_{x|y|z}_{slice}`).
+3. Else, it groups by **image stem** (so multiple QA items for the same image never leak across splits).
+
+## 4) Generate Comparative-RFT B1–B7 data from train (step 6)
+
+Generate a new `jsonl` with B1–B7 tasks from a base `train.jsonl` (or the few-shot train file):
+
+```bash
+python EasyR1/scripts/OminiExpert/omnimed_expert.py build-comparative \
+  --input data/OminiMedExpert/isic2018_2020_disease_diagnosis/train.jsonl \
+  --output data/OminiMedExpert/isic2018_2020_disease_diagnosis/comparative/train_b_tasks.jsonl \
+  --label-space-by question_type+optioncount \
+  --task B1=1000 --task B2=1000 --task B3=1000 --task B4=1000 --task B5=1000 --task B6=1000 --task B7=1000 \
+  --k 4 \
+  --b4-candidates 3 \
+  --b7-nway 5 \
+  --seed 123
+```
+
+Each generated sample includes:
+
+- `answer.task_suite = "B"`
+- `answer.task_type = "B1_target_search" | ... | "B7_support_set_nway"`
+- `answer.correct_answer` (verifiable discrete target)
+- `answer.label_space_key` and `answer.label_space_by` (for tracking performance by task + label space)

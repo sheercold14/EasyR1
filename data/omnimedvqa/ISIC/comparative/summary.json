@@ -1,0 +1,46 @@
+{
+  "train": {
+    "total": 1502,
+    "labels": {
+      "Melanocytic nevus": 424,
+      "Basal cell carcinoma": 278,
+      "Melanoma": 265,
+      "Benign keratosis": 185,
+      "Actinic keratosis": 143,
+      "Squamous cell carcinoma": 115,
+      "Vascular lesion": 48,
+      "Dermatofibroma": 44
+    },
+    "num_options": {
+      "4": 1502
+    },
+    "datasets": {
+      "ISIC2019": 1352,
+      "ISIC2018": 150
+    }
+  },
+  "val": {
+    "total": 308,
+    "labels": {
+      "Basal cell carcinoma": 69,
+      "Melanocytic nevus": 68,
+      "Melanoma": 58,
+      "Benign keratosis": 37,
+      "Actinic keratosis": 36,
+      "Squamous cell carcinoma": 18,
+      "Dermatofibroma": 12,
+      "Vascular lesion": 10
+    },
+    "num_options": {
+      "4": 308
+    },
+    "datasets": {
+      "ISIC2019": 285,
+      "ISIC2018": 23
+    }
+  },
+  "unknown_bucket_counts": {
+    "train": {},
+    "val": {}
+  }
+}

@@ -194,6 +194,15 @@ worker:
 - **Qwen3-VL-2B-Instruct** (default)
 - Modify `MODEL_PATH` in training script for other models
 
+## OminiMedExpert (ISIC) Training
+
+ISIC setup for **OminiMedExpert** outputs (mcq_letter + B1–B7):
+
+- Config: `Comparative-R1/configs/omnimed_isic_gspo.yaml`
+- Prompt wrapper: `Comparative-R1/prompts/omnimed_isic.jinja`
+- Reward: `Comparative-R1/reward/omnimed_isic_reward.py`
+- Launcher: `Comparative-R1/train_omnimed_isic.sh`
+
 ## Citation
 
 If you use this framework, please cite EasyR1.

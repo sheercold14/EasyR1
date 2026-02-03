@@ -12,7 +12,8 @@ set -e
 
 export NCCL_CUMEM_HOST_ENABLE=0
 # ===== Configuration =====
-MODEL_PATH=/data/shichao/models/Qwen3-VL-2B-Instruct
+# MODEL_PATH=/data/shichao/models/Qwen3-VL-2B-Instruct
+MODEL_PATH=Qwen/Qwen2.5-VL-7B-Instruct
 DATA_PATH=/data/shichao/EasyR1/data/thyroid/all.jsonl
 OUTPUT_DIR=/data/shichao/EasyR1/data/thyroid/comparative_r1
 IMAGE_ROOT=/data/shichao/hospital3/hospital3_thyroid_merged 

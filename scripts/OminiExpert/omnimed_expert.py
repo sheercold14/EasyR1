@@ -124,15 +124,24 @@ def discover_omnimedvqa_datasets(omni_root: Path) -> dict[str, Path]:
 def build_prompt(question: str, options: dict[str, str | None]) -> str:
     q = _norm_text(question)
     rendered: list[str] = []
+    letters: list[str] = []
     for k in OPTION_KEYS:
         v = options.get(k)
         if v is None:
             continue
         if _is_empty_option(v):
             continue
-        rendered.append(f"{LETTER_BY_OPTION_KEY[k]}. {_norm_text(v)}")
+        ltr = LETTER_BY_OPTION_KEY[k]
+        letters.append(ltr)
+        rendered.append(f"{ltr}. {_norm_text(v)}")
     if rendered:
-        return f"Question: {q}\nOptions:\n" + "\n".join(rendered) + "\nAnswer with the exact option text."
+        ltr_opts = _letter_options(letters)
+        # Keep the prompt self-contained and verifiable (short discrete output).
+        return (
+            f"Question: {q}\nOptions:\n"
+            + "\n".join(rendered)
+            + f"\nAnswer with only the option letter ({ltr_opts}).\n<answer></answer>"
+        )
     return f"Question: {q}\nAnswer succinctly."
 
 
@@ -413,21 +422,26 @@ def build_base_rows(
         if answer_id is None:
             missing_answer_id += 1
 
+        answer_payload = {
+            "label": gt_answer,
+            "answer_id": answer_id,
+            "question_id": question_id,
+            "dataset": dataset,
+            "question_type": qtype,
+            "modality_type": modality,
+            "group_id": group_id,
+            "group_id_source": group_id_source,
+            **{k: options.get(k) for k in OPTION_KEYS},
+        }
+        if opt_count > 0 and answer_id is not None:
+            answer_payload["correct_answer"] = answer_id
+            answer_payload["task_type"] = "mcq_letter"
+
         rows.append(
             {
                 "prompt": prompt,
                 "images": [root_rel_img],
-                "answer": {
-                    "label": gt_answer,
-                    "answer_id": answer_id,
-                    "question_id": question_id,
-                    "dataset": dataset,
-                    "question_type": qtype,
-                    "modality_type": modality,
-                    "group_id": group_id,
-                    "group_id_source": group_id_source,
-                    **{k: options.get(k) for k in OPTION_KEYS},
-                },
+                "answer": answer_payload,
             }
         )
 
@@ -888,8 +902,10 @@ def gen_b7_support_set_nway(rng: random.Random, *, by_label: dict[str, list[VqaI
             "correct_answer": correct,
             "support_labels": support_labels,
             "target_label": target_label,
-            "question_ids": {"support": [s.question_id for s in supports], "query": query_item.question_id},
-            "datasets": {"support": [s.dataset for s in supports], "query": query_item.dataset},
+            # Keep types consistent across tasks for HF/pyarrow JSON loading:
+            # use flat lists aligned with `images` (supports then query).
+            "question_ids": [* [s.question_id for s in supports], query_item.question_id],
+            "datasets": [* [s.dataset for s in supports], query_item.dataset],
         },
     }
 

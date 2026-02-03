@@ -35,12 +35,12 @@ Example: merge ISIC2018-2020, keep only `Disease Diagnosis`, split into train/va
 python EasyR1/scripts/OminiExpert/omnimed_expert.py build-base \
   --datasets ISIC2018 ISIC2019 ISIC2020 \
   --question-type "Disease Diagnosis" \
-  --min-option-count 4 --max-option-count 4 \
-  --split 0.8,0.1,0.1 \
+  --min-option-count 2 --max-option-count 4 \
+  --split 0.7,0.1,0.2 \
   --seed 42 \
   --skip-missing-images \
   --fewshot-ratio 0.05 \
-  --out-dir data/OminiMedExpert/isic2018_2020_disease_diagnosis
+  --out-dir data/OminiMedExpert/isic_disease_diagnosis_v0_0.05
 ```
 
 Outputs:
@@ -50,6 +50,8 @@ Outputs:
 - `data/OminiMedExpert/isic2018_2020_disease_diagnosis/test.jsonl`
 - `data/OminiMedExpert/isic2018_2020_disease_diagnosis/train_fewshot_0.05.jsonl` (if enabled)
 - `data/OminiMedExpert/isic2018_2020_disease_diagnosis/summary.json`
+
+Prompt format for MCQ rows asks the model to answer with the **option letter** (A/B/C/D); `answer.correct_answer` is also filled for verification.
 
 ### Notes on leakage-aware splitting
 
@@ -68,7 +70,7 @@ python EasyR1/scripts/OminiExpert/omnimed_expert.py build-comparative \
   --input data/OminiMedExpert/isic2018_2020_disease_diagnosis/train.jsonl \
   --output data/OminiMedExpert/isic2018_2020_disease_diagnosis/comparative/train_b_tasks.jsonl \
   --label-space-by question_type+optioncount \
-  --task B1=1000 --task B2=1000 --task B3=1000 --task B4=1000 --task B5=1000 --task B6=1000 --task B7=1000 \
+  --task B1=20 --task B2=1000 --task B3=1000 --task B4=1000 --task B5=1000 --task B6=1000 --task B7=1000 \
   --k 4 \
   --b4-candidates 3 \
   --b7-nway 5 \

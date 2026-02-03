@@ -176,6 +176,7 @@ cython_debug/
 # outputs
 outputs/
 checkpoints/
+checkpoints
 wandb/
 tensorboard_log/
 

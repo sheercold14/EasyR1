@@ -1,0 +1,117 @@
+data:
+  # Train on B1–B7 comparative tasks (few-shot 0.05 example).
+  # You can switch to train.jsonl or another file via CLI overrides.
+  train_files: /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/isic_disease_diagnosis_v0_0.05/train_mix_fewshot0.05_plus_btasks.jsonl
+  val_files: ../data/OminiMedExpert/isic2018_2019_2020_disease_diagnosis/val.jsonl
+  prompt_key: prompt
+  answer_key: answer
+  image_key: images
+  video_key: videos
+  # OmniMedVQA root. Works with image paths like "/Images/..."
+  image_dir: ../data/OmniMedVQA
+  video_fps: 2.0
+  max_prompt_length: 8192
+  max_response_length: 256
+  rollout_batch_size: 32
+  mini_rollout_batch_size: null
+  val_batch_size: 16
+  # Adds <image> only when missing (for single-image rows).
+  format_prompt: Comparative-R1/prompts/omnimed_isic.jinja
+  override_chat_template: null
+  shuffle: true
+  seed: 42
+  min_pixels: 262144
+  max_pixels: 4194304
+  filter_overlong_prompts: true
+
+algorithm:
+  adv_estimator: grpo
+  disable_kl: true
+  use_kl_loss: false
+  kl_penalty: low_var_kl
+  kl_coef: 0.0
+  online_filtering: false
+  filter_key: overall
+  filter_low: 0.01
+  filter_high: 0.99
+
+worker:
+  actor:
+    loss_type: gspo_token
+    loss_avg_mode: seq
+    clip_ratio_low: 3e-4
+    clip_ratio_high: 4e-4
+    global_batch_size: 32
+    micro_batch_size_per_device_for_update: 1
+    micro_batch_size_per_device_for_experience: 2
+    max_grad_norm: 1.0
+    padding_free: true
+    dynamic_batching: true
+    ulysses_size: 1
+    model:
+      # Override this to your local checkpoint directory if needed.
+      model_path: Qwen/Qwen2.5-7B-Instruct
+      enable_gradient_checkpointing: true
+      trust_remote_code: true
+      freeze_vision_tower: false
+    optim:
+      lr: 1.0e-6
+      weight_decay: 1.0e-2
+      strategy: adamw
+      lr_warmup_ratio: 0.0
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: true
+      offload_optimizer: true
+
+  rollout:
+    n: 4
+    temperature: 0.7
+    top_p: 0.9
+    # 0 => no limit; B7 has up to (n_way + 1) images.
+    limit_images: 6
+    gpu_memory_utilization: 0.6
+    enforce_eager: false
+    enable_chunked_prefill: false
+    tensor_parallel_size: 1
+    disable_tqdm: false
+    val_override_config:
+      temperature: 0.6
+      top_p: 0.95
+      n: 1
+    max_num_batched_tokens: 9216
+
+  ref:
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: true
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+
+  reward:
+    reward_function: Comparative-R1/reward/omnimed_isic_reward.py:compute_score
+
+trainer:
+  total_epochs: 1000
+  max_steps: null
+  project_name: comparative_r1
+  experiment_name: omnimed_isic_b_tasks_gspo
+  logger: ["file", "swanlab"]
+  nnodes: 1
+  n_gpus_per_node: 4
+  max_try_make_batch: 20
+  val_freq: 5
+  val_before_train: false
+  val_only: false
+  val_generations_to_log: 6
+  save_freq: 5
+  save_limit: 1
+  save_model_only: false
+  save_checkpoint_path: null
+  load_checkpoint_path: null
+  find_last_checkpoint: true
+

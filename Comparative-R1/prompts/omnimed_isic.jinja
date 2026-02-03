@@ -1,0 +1,9 @@
+You are a medical VQA assistant for dermoscopy images.
+
+{# Ensure image placeholders exist for single-image rows. #}
+{% if "<image>" in content -%}
+{{ content | trim }}
+{% else -%}
+<image>
+{{ content | trim }}
+{% endif -%}

@@ -1,0 +1,53 @@
+{
+  "output": "data/OminiMedExpert/_scratch/isic_train_btasks.jsonl",
+  "info": {
+    "seed": 123,
+    "label_space_by": "question_type+optioncount",
+    "k": 4,
+    "b4_candidates": 3,
+    "b5_same_prob": 0.5,
+    "b7_nway": 4,
+    "requested": {
+      "B1": 10,
+      "B2": 10,
+      "B3": 5,
+      "B4": 10,
+      "B5": 10,
+      "B6": 5,
+      "B7": 5
+    },
+    "generated": 55,
+    "task_failures": {},
+    "num_label_spaces": 2
+  },
+  "tasks": [
+    [
+      "B4_exemplar_match",
+      10
+    ],
+    [
+      "B5_same_different",
+      10
+    ],
+    [
+      "B1_target_search",
+      10
+    ],
+    [
+      "B2_odd_one_out",
+      10
+    ],
+    [
+      "B7_support_set_nway",
+      5
+    ],
+    [
+      "B3_label_corruption",
+      5
+    ],
+    [
+      "B6_pair_finding",
+      5
+    ]
+  ]
+}

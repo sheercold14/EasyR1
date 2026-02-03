@@ -1,0 +1,134 @@
+{
+  "datasets": [
+    "ISIC2018",
+    "ISIC2019",
+    "ISIC2020"
+  ],
+  "filters": {
+    "question_type": [
+      "Disease Diagnosis"
+    ],
+    "modality_type": [],
+    "min_option_count": 2,
+    "max_option_count": 4
+  },
+  "build": {
+    "total_raw_items": 3804,
+    "written_rows": 3022,
+    "skipped_filter": 782,
+    "invalid_items": 0,
+    "missing_images": 0,
+    "missing_answer_id": 0,
+    "omni_root": "/mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA"
+  },
+  "split": {
+    "num_groups": 3022,
+    "num_groups_train": 2115,
+    "num_groups_val": 302,
+    "num_groups_test": 605,
+    "group_id_sources_top20": {
+      "image_stem": 3022
+    },
+    "ratios": {
+      "train": 0.7,
+      "val": 0.1,
+      "test": 0.2
+    },
+    "seed": 42
+  },
+  "train": {
+    "total": 2115,
+    "labels_top50": {
+      "Benign image.": 793,
+      "Melanocytic nevus": 341,
+      "Melanoma": 230,
+      "Basal cell carcinoma": 224,
+      "Benign keratosis": 156,
+      "Actinic keratosis": 128,
+      "Squamous cell carcinoma": 97,
+      "Malignant": 74,
+      "Vascular lesion": 41,
+      "Dermatofibroma": 31
+    },
+    "datasets": {
+      "ISIC2019": 1126,
+      "ISIC2020": 867,
+      "ISIC2018": 122
+    },
+    "question_types": {
+      "Disease Diagnosis": 2115
+    }
+  },
+  "val": {
+    "total": 302,
+    "labels_top50": {
+      "Benign image.": 107,
+      "Melanocytic nevus": 49,
+      "Basal cell carcinoma": 42,
+      "Melanoma": 35,
+      "Benign keratosis": 19,
+      "Squamous cell carcinoma": 19,
+      "Actinic keratosis": 13,
+      "Dermatofibroma": 7,
+      "Vascular lesion": 6,
+      "Malignant": 5
+    },
+    "datasets": {
+      "ISIC2019": 171,
+      "ISIC2020": 112,
+      "ISIC2018": 19
+    },
+    "question_types": {
+      "Disease Diagnosis": 302
+    }
+  },
+  "test": {
+    "total": 605,
+    "labels_top50": {
+      "Benign image.": 207,
+      "Melanocytic nevus": 102,
+      "Basal cell carcinoma": 81,
+      "Melanoma": 58,
+      "Benign keratosis": 47,
+      "Actinic keratosis": 38,
+      "Malignant": 26,
+      "Dermatofibroma": 18,
+      "Squamous cell carcinoma": 17,
+      "Vascular lesion": 11
+    },
+    "datasets": {
+      "ISIC2019": 340,
+      "ISIC2020": 233,
+      "ISIC2018": 32
+    },
+    "question_types": {
+      "Disease Diagnosis": 605
+    }
+  },
+  "fewshot": {
+    "ratio": 0.05,
+    "train_fewshot": {
+      "total": 106,
+      "labels_top50": {
+        "Dermatofibroma": 11,
+        "Squamous cell carcinoma": 11,
+        "Benign image.": 11,
+        "Vascular lesion": 11,
+        "Basal cell carcinoma": 11,
+        "Actinic keratosis": 11,
+        "Melanoma": 10,
+        "Benign keratosis": 10,
+        "Melanocytic nevus": 10,
+        "Malignant": 10
+      },
+      "datasets": {
+        "ISIC2019": 82,
+        "ISIC2020": 21,
+        "ISIC2018": 3
+      },
+      "question_types": {
+        "Disease Diagnosis": 106
+      }
+    }
+  }
+}

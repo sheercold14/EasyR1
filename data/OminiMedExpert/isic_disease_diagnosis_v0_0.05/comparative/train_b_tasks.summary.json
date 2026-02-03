@@ -1,0 +1,53 @@
+{
+  "output": "/mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/isic_disease_diagnosis_v0_0.05/comparative/train_b_tasks.jsonl",
+  "info": {
+    "seed": 123,
+    "label_space_by": "question_type+optioncount",
+    "k": 4,
+    "b4_candidates": 3,
+    "b5_same_prob": 0.5,
+    "b7_nway": 3,
+    "requested": {
+      "B1": 30,
+      "B2": 30,
+      "B3": 30,
+      "B4": 30,
+      "B5": 30,
+      "B6": 30,
+      "B7": 30
+    },
+    "generated": 210,
+    "task_failures": {},
+    "num_label_spaces": 2
+  },
+  "tasks": [
+    [
+      "B5_same_different",
+      30
+    ],
+    [
+      "B3_label_corruption",
+      30
+    ],
+    [
+      "B2_odd_one_out",
+      30
+    ],
+    [
+      "B6_pair_finding",
+      30
+    ],
+    [
+      "B7_support_set_nway",
+      30
+    ],
+    [
+      "B4_exemplar_match",
+      30
+    ],
+    [
+      "B1_target_search",
+      30
+    ]
+  ]
+}

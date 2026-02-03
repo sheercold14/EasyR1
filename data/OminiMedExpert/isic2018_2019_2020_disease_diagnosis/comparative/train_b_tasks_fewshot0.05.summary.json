@@ -1,0 +1,53 @@
+{
+  "output": "data/OminiMedExpert/isic2018_2019_2020_disease_diagnosis/comparative/train_b_tasks_fewshot0.05.jsonl",
+  "info": {
+    "seed": 123,
+    "label_space_by": "question_type+optioncount",
+    "k": 4,
+    "b4_candidates": 3,
+    "b5_same_prob": 0.5,
+    "b7_nway": 5,
+    "requested": {
+      "B1": 20,
+      "B2": 20,
+      "B3": 20,
+      "B4": 20,
+      "B5": 20,
+      "B6": 20,
+      "B7": 20
+    },
+    "generated": 140,
+    "task_failures": {},
+    "num_label_spaces": 2
+  },
+  "tasks": [
+    [
+      "B2_odd_one_out",
+      20
+    ],
+    [
+      "B6_pair_finding",
+      20
+    ],
+    [
+      "B1_target_search",
+      20
+    ],
+    [
+      "B4_exemplar_match",
+      20
+    ],
+    [
+      "B7_support_set_nway",
+      20
+    ],
+    [
+      "B5_same_different",
+      20
+    ],
+    [
+      "B3_label_corruption",
+      20
+    ]
+  ]
+}

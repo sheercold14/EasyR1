@@ -36,7 +36,7 @@ python EasyR1/scripts/OminiExpert/omnimed_expert.py build-base \
   --datasets ISIC2018 ISIC2019 ISIC2020 \
   --question-type "Disease Diagnosis" \
   --min-option-count 2 --max-option-count 4 \
-  --split 0.7,0.1,0.2 \
+  --split 0.7,0.0,0.3 \
   --seed 42 \
   --skip-missing-images \
   --fewshot-ratio 0.05 \

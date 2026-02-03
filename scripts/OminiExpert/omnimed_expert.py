@@ -7,7 +7,7 @@ This script supports:
   2) Filtering by question_type (and other optional fields)
   3) Train/val/test splitting with leak-avoidance via grouping keys
   4) Few-shot sampling from train with per-label balancing
-  5) Writing EasyR1-compatible JSONL with root-relative image paths
+  5) Writing EasyR1-compatible JSONL with `Images/...` relative image paths
   6) Expanding train data into multi-image comparative tasks (B1–B7)
 
 Default paths assume this repo layout:
@@ -162,11 +162,11 @@ def infer_answer_id(gt_answer: str, options: dict[str, str | None]) -> str | Non
 
 
 def to_root_relative_image_path(image_path: str) -> str:
-    # Store as root-relative (leading "/") to match the user's desired convention.
+    # Store as OmniMedVQA-root relative path without leading slash, e.g. "Images/...".
     p = str(image_path).strip()
     if not p:
         return ""
-    return "/" + p.lstrip("/")
+    return p.lstrip("/")
 
 
 def resolve_image_path(omni_root: Path, root_rel_path: str) -> Path:

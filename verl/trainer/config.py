@@ -95,6 +95,30 @@ class AlgorithmConfig:
     filter_high: float = 0.99
     """filter out high reward samples if online filtering"""
 
+    # ---- Multi-task stabilization knobs (optional) ----
+    task_adv_weights: dict[str, float] = field(default_factory=dict)
+    """
+    Optional per-task multiplier applied to *advantages* (after advantage computation).
+    This is the correct place to reweight tasks under GRPO, because GRPO per-uid z-scoring
+    makes reward scaling ineffective.
+
+    Example:
+      task_adv_weights:
+        mcq_letter: 1.0
+        B1_target_search: 0.5
+        B2_odd_one_out: 0.5
+        "*": 1.0   # default fallback
+    """
+
+    adv_per_task_whiten: bool = False
+    """If true, whiten advantages within each task_type group (masked by response_mask)."""
+    adv_per_task_whiten_eps: float = 1e-8
+    """Numerical eps used for per-task advantage whitening."""
+    adv_per_task_whiten_min_count: int = 32
+    """Minimum number of masked advantage elements required to whiten a task group."""
+    task_adv_ops_enable: bool = False
+    """If true, enable task-aware advantage ops (per-task weights / per-task whitening) during training."""
+
 
 @dataclass
 class TrainerConfig:
@@ -138,6 +162,19 @@ class TrainerConfig:
     """file to save ray timeline"""
     find_last_checkpoint: bool = True
     """automatically find the last checkpoint in the save checkpoint path to resume training"""
+
+    # ---- Reporting stability knobs (optional) ----
+    task_metrics_enable: bool = False
+    """If true, log stable per-task metrics (EMA + rolling-window + epoch aggregation when possible)."""
+    task_metrics_ema_alpha: float = 0.1
+    """EMA smoothing factor used for per-task accuracy smoothing (count-based EMA)."""
+    task_metrics_window_steps: int = 20
+    """Rolling window size in steps for per-task accuracy (computed from correct/total counts)."""
+    task_metrics_min_samples_per_epoch_task: int = 50
+    """
+    When epoch aggregation is enabled (dataset length known), only emit per-task epoch accuracy
+    if the task has seen at least this many samples in that epoch (to avoid noisy points).
+    """
 
     def post_init(self):
         if self.save_checkpoint_path is None:

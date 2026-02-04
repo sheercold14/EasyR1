@@ -155,6 +155,202 @@ def compute_advantage(data: DataProto, adv_estimator: AdvantageEstimator, gamma:
     return data
 
 
+def _extract_task_types_from_ground_truth(ground_truth_batch) -> list[str]:
+    # ground_truth entries come from Dataset (see verl/utils/dataset.py) and may be:
+    # - dict (e.g. {"task_type": ..., "correct_answer": ...})
+    # - str / other scalar for simpler datasets
+    task_types: list[str] = []
+    try:
+        gt_list = ground_truth_batch.tolist()
+    except Exception:
+        gt_list = list(ground_truth_batch)
+
+    for gt in gt_list:
+        if isinstance(gt, dict):
+            tt = gt.get("task_type", "unknown")
+            task_types.append(tt if isinstance(tt, str) and tt else "unknown")
+        else:
+            task_types.append("unknown")
+    return task_types
+
+
+def apply_task_aware_advantage_ops(
+    data: DataProto,
+    task_adv_weights: dict[str, float],
+    per_task_whiten: bool,
+    whiten_eps: float,
+    whiten_min_count: int,
+    also_update_returns: bool,
+) -> DataProto:
+    """
+    Multi-task stabilization:
+    1) Optional: scale advantages by task type (this survives GRPO per-uid normalization).
+    2) Optional: whiten advantages within each task group (masked by response_mask) to equalize gradient scale.
+
+    Notes:
+    - For GAE, we only modify `advantages` (not `returns`) so critic targets remain consistent.
+    - For GRPO, `returns == advantages`, so the scaling affects the effective policy gradient magnitude.
+    """
+    if "ground_truth" not in data.non_tensor_batch:
+        return data
+
+    task_types = _extract_task_types_from_ground_truth(data.non_tensor_batch["ground_truth"])
+    if len(task_types) != len(data):
+        return data
+
+    advantages: torch.Tensor = data.batch["advantages"]
+    response_mask: torch.Tensor = data.batch["response_mask"].bool()
+
+    # (1) Task-wise weights (default fallback via "*" or 1.0).
+    if task_adv_weights:
+        fallback = float(task_adv_weights.get("*", 1.0))
+        weights = [float(task_adv_weights.get(tt, fallback)) for tt in task_types]
+        w = torch.tensor(weights, device=advantages.device, dtype=advantages.dtype).unsqueeze(-1)
+        advantages = advantages * w
+
+    # (2) Per-task whitening (masked).
+    if per_task_whiten:
+        # Group indices by task type.
+        tt2idx: dict[str, list[int]] = {}
+        for i, tt in enumerate(task_types):
+            tt2idx.setdefault(tt, []).append(i)
+
+        adv_out = advantages.clone()
+        for _, idxs in tt2idx.items():
+            idx = torch.tensor(idxs, device=advantages.device, dtype=torch.long)
+            m = response_mask.index_select(0, idx)
+            a = advantages.index_select(0, idx)
+            vals = torch.masked_select(a, m)
+            if vals.numel() < int(whiten_min_count):
+                continue
+            mean = vals.mean()
+            std = vals.std(unbiased=False)
+            adv_norm = (a - mean) / (std + float(whiten_eps))
+            # Only apply on masked positions; keep others untouched.
+            adv_out.index_copy_(0, idx, torch.where(m, adv_norm, a))
+        advantages = adv_out
+
+    data.batch["advantages"] = advantages
+    if also_update_returns:
+        # For non-critic estimators (e.g. GRPO), returns are not used for learning.
+        # Keep returns consistent with advantages for cleaner logging/debugging.
+        data.batch["returns"] = advantages
+    return data
+
+
+class TaskMetricsReporter:
+    """
+    Build stable per-task curves from per-step (correct, total) counts.
+
+    We intentionally compute everything from:
+      - reward/task/n/<task>
+      - reward/task/correct/<task>
+    instead of per-step acc, because per-step acc is noisy and may be undefined when n==0.
+    """
+
+    def __init__(
+        self,
+        ema_alpha: float = 0.1,
+        window_steps: int = 20,
+        min_samples_per_epoch_task: int = 50,
+        dataset_len: int | None = None,
+        rollout_batch_size: int = 1,
+    ) -> None:
+        self.ema_alpha = float(ema_alpha)
+        self.window_steps = int(window_steps)
+        self.min_samples_per_epoch_task = int(min_samples_per_epoch_task)
+        self.dataset_len = int(dataset_len) if dataset_len and dataset_len > 0 else None
+        self.rollout_batch_size = int(rollout_batch_size)
+
+        # task -> (ema_correct, ema_total)
+        self._ema: dict[str, tuple[float, float]] = {}
+
+        from collections import deque
+
+        # task -> deque of (correct, total)
+        self._window: dict[str, deque[tuple[float, float]]] = {}
+
+        # epoch aggregation (only if dataset_len is known)
+        self._epoch_idx: int | None = 0 if self.dataset_len is not None else None
+        self._epoch_accum: dict[str, tuple[float, float]] = {}  # task -> (correct, total)
+
+    def _discover_tasks(self, metrics: dict[str, Any]) -> list[str]:
+        prefix = "reward/task/n/"
+        tasks = []
+        for k in metrics.keys():
+            if k.startswith(prefix):
+                tasks.append(k[len(prefix) :])
+        return tasks
+
+    def update(self, metrics: dict[str, Any], global_step: int) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        tasks = self._discover_tasks(metrics)
+        if not tasks:
+            return out
+
+        # Epoch bookkeeping based on prompt count (not rollout count).
+        if self.dataset_len is not None:
+            prompts_seen = global_step * self.rollout_batch_size
+            epoch_idx = prompts_seen // self.dataset_len
+            epoch_float = prompts_seen / self.dataset_len
+            out["trainer/epoch"] = float(epoch_float)
+            out["trainer/epoch_idx"] = int(epoch_idx)
+
+            if self._epoch_idx is None:
+                self._epoch_idx = int(epoch_idx)
+            elif int(epoch_idx) != int(self._epoch_idx):
+                # Emit completed epoch metrics before resetting.
+                completed_epoch = int(self._epoch_idx)
+                for t, (c, n) in self._epoch_accum.items():
+                    if n >= self.min_samples_per_epoch_task:
+                        out[f"task_epoch/acc/{t}"] = float(c / n)
+                        out[f"task_epoch/n/{t}"] = float(n)
+                        out[f"task_epoch/epoch_idx/{t}"] = float(completed_epoch)
+                self._epoch_accum = {}
+                self._epoch_idx = int(epoch_idx)
+
+        for t in tasks:
+            n = metrics.get(f"reward/task/n/{t}", 0.0)
+            c = metrics.get(f"reward/task/correct/{t}", 0.0)
+            if not isinstance(n, (int, float)) or not isinstance(c, (int, float)):
+                continue
+            n = float(n)
+            c = float(c)
+
+            # Track EMA on counts (robust to varying batch sizes).
+            ema_c, ema_n = self._ema.get(t, (0.0, 0.0))
+            a = self.ema_alpha
+            ema_c = (1.0 - a) * ema_c + a * c
+            ema_n = (1.0 - a) * ema_n + a * n
+            self._ema[t] = (ema_c, ema_n)
+            if ema_n > 0:
+                out[f"task_smooth/ema_acc/{t}"] = float(ema_c / ema_n)
+                out[f"task_smooth/ema_n/{t}"] = float(ema_n)
+
+            # Rolling window over steps (stable by counts).
+            if self.window_steps > 0:
+                dq = self._window.get(t)
+                if dq is None:
+                    from collections import deque
+
+                    dq = deque()
+                    self._window[t] = dq
+                dq.append((c, n))
+                while len(dq) > self.window_steps:
+                    dq.popleft()
+                win_c = sum(x for x, _ in dq)
+                win_n = sum(y for _, y in dq)
+                out[f"task_smooth/window_acc/{t}"] = float(win_c / win_n) if win_n > 0 else 0.0
+                out[f"task_smooth/window_n/{t}"] = float(win_n)
+
+            # Epoch accumulators: accumulate counts for completed epoch reporting.
+            if self.dataset_len is not None:
+                ec, en = self._epoch_accum.get(t, (0.0, 0.0))
+                self._epoch_accum[t] = (ec + c, en + n)
+
+        return out
+
+
 class RayPPOTrainer:
     """
     Note that this trainer runs on the driver process on a single CPU/GPU node.
@@ -646,6 +842,18 @@ class RayPPOTrainer:
                         gamma=self.config.algorithm.gamma,
                         lam=self.config.algorithm.lam,
                     )
+                    if (
+                        getattr(self.config.algorithm, "task_adv_ops_enable", False)
+                        and (self.config.algorithm.task_adv_weights or self.config.algorithm.adv_per_task_whiten)
+                    ):
+                        batch = apply_task_aware_advantage_ops(
+                            batch,
+                            task_adv_weights=self.config.algorithm.task_adv_weights,
+                            per_task_whiten=self.config.algorithm.adv_per_task_whiten,
+                            whiten_eps=self.config.algorithm.adv_per_task_whiten_eps,
+                            whiten_min_count=self.config.algorithm.adv_per_task_whiten_min_count,
+                            also_update_returns=not self.use_critic,
+                        )
 
                 # update critic
                 if self.use_critic:
@@ -693,6 +901,23 @@ class RayPPOTrainer:
                         "data/online_drop_rate": drop_stats["drop_rate"],
                     }
                 )
+
+            # Stable per-task reporting (EMA + rolling window + epoch aggregation when possible).
+            if getattr(self.config.trainer, "task_metrics_enable", False):
+                if not hasattr(self, "_task_metrics_reporter"):
+                    dataset_len = None
+                    try:
+                        dataset_len = len(self.train_dataloader.dataset)
+                    except Exception:
+                        dataset_len = None
+                    self._task_metrics_reporter = TaskMetricsReporter(
+                        ema_alpha=getattr(self.config.trainer, "task_metrics_ema_alpha", 0.1),
+                        window_steps=getattr(self.config.trainer, "task_metrics_window_steps", 20),
+                        min_samples_per_epoch_task=getattr(self.config.trainer, "task_metrics_min_samples_per_epoch_task", 50),
+                        dataset_len=dataset_len,
+                        rollout_batch_size=self.config.data.rollout_batch_size,
+                    )
+                metrics.update(self._task_metrics_reporter.update(metrics=metrics, global_step=self.global_step))
 
             self.logger.log(data=metrics, step=self.global_step)
             main_tqdm.update()

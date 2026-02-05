@@ -10,13 +10,13 @@
 set -e
 
 EASYR1_ROOT="/mnt/cache/wuruixiao/users/lsc/EasyR1"
-REPO_ROOT="/mnt/cache/wuruixiao/users/lsc/"
+REPO_ROOT="/mnt/cache/wuruixiao/users/lsc"
 
 # ===== Paths =====
 MODEL_PATH=${MODEL_PATH:-"/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b"}
-DATA_DIR=${DATA_DIR:-"${EASYR1_ROOT}/data/OminiMedExpert/isic_disease_diagnosis_v0_0.05"}
-TRAIN_FILE=${TRAIN_FILE:-"${DATA_DIR}/train_mix_fewshot0.05_plus_btasks_relpath.jsonl"}
-VAL_FILE=${VAL_FILE:-"${DATA_DIR}/val.jsonl"}
+DATA_DIR=${DATA_DIR:-"${EASYR1_ROOT}/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05"}
+TRAIN_FILE=${TRAIN_FILE:-"${DATA_DIR}/train_btasks+fewshot0.5_shuf_seed42.jsonl"}
+VAL_FILE=${VAL_FILE:-"${DATA_DIR}/test.jsonl"}
 OMNI_ROOT=${OMNI_ROOT:-"${REPO_ROOT}/data/OmniMedVQA"}
 
 CONFIG=${CONFIG:-"${EASYR1_ROOT}/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml"}
@@ -30,7 +30,7 @@ N_SAMPLES=${N_SAMPLES:-4}
 TEMPERATURE=${TEMPERATURE:-0.7}
 SAVE_FREQ=${SAVE_FREQ:-5}
 
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_btasks_n${N_SAMPLES}_t${TEMPERATURE}_taskaware"}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_btasks_v1_n${N_SAMPLES}_t${TEMPERATURE}_taskaware"}
 
 echo "=========================================="
 echo "OminiMedExpert ISIC Training (Task-Aware)"

@@ -39,8 +39,8 @@ python EasyR1/scripts/OminiExpert/omnimed_expert.py build-base \
   --split 0.7,0.0,0.3 \
   --seed 42 \
   --skip-missing-images \
-  --fewshot-ratio 0.05 \
-  --out-dir data/OminiMedExpert/isic_disease_diagnosis_v0_0.05
+  --fewshot-ratio 0.5 \
+  --out-dir data/OminiMedExpert/isic_disease_diagnosis_v1_0.05
 ```
 
 Outputs:
@@ -67,13 +67,13 @@ Generate a new `jsonl` with B1–B7 tasks from a base `train.jsonl` (or the few-
 
 ```bash
 python EasyR1/scripts/OminiExpert/omnimed_expert.py build-comparative \
-  --input data/OminiMedExpert/isic2018_2020_disease_diagnosis/train.jsonl \
-  --output data/OminiMedExpert/isic2018_2020_disease_diagnosis/comparative/train_b_tasks.jsonl \
+  --input EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test.jsonl \
+  --output EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/test_b_tasks_7_100.jsonl \
   --label-space-by question_type+optioncount \
-  --task B1=20 --task B2=1000 --task B3=1000 --task B4=1000 --task B5=1000 --task B6=1000 --task B7=1000 \
+  --task B1=100 --task B2=100 --task B3=100 --task B4=100 --task B5=100 --task B6=100 --task B7=100 \
   --k 4 \
   --b4-candidates 3 \
-  --b7-nway 5 \
+  --b7-nway 3 \
   --seed 123
 ```
 

@@ -1,0 +1,19 @@
+{
+  "inputs": [
+    "EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/train_b_tasks.jsonl",
+    "EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5.jsonl"
+  ],
+  "output": "EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_btasks+fewshot0.5_shuf_seed42.jsonl",
+  "seed": 42,
+  "shuffle": true,
+  "dedupe_key": null,
+  "rows_before": 1177,
+  "rows_after": 1177,
+  "dedupe_dropped": 0,
+  "per_input_counts": {
+    "EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/train_b_tasks.jsonl": 300,
+    "EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5.jsonl": 877
+  },
+  "question_type_counts": {},
+  "dataset_counts": {}
+}

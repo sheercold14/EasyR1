@@ -9,7 +9,7 @@ data:
   video_key: videos
   image_dir: /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA
   video_fps: 2.0
-  max_prompt_length: 8192
+  max_prompt_length: 30000
   max_response_length: 256
   rollout_batch_size: 32
   mini_rollout_batch_size: null
@@ -97,7 +97,7 @@ worker:
       temperature: 0.6
       top_p: 0.95
       n: 1
-    max_num_batched_tokens: 9216
+    max_num_batched_tokens: 40000
 
   ref:
     fsdp:

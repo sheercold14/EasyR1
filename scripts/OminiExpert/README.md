@@ -83,3 +83,6 @@ Each generated sample includes:
 - `answer.task_type = "B1_target_search" | ... | "B7_support_set_nway"`
 - `answer.correct_answer` (verifiable discrete target)
 - `answer.label_space_key` and `answer.label_space_by` (for tracking performance by task + label space)
+
+Note on prompts: B1/B2/B4/B5/B6 now ask the model to first output each image's label (e.g., `A: Melanoma`),
+then provide a final answer line (`Final: ...`) inside `<answer>...</answer>`. B3/B7 remain single-letter.

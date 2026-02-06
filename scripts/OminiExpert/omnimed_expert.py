@@ -528,6 +528,16 @@ def _letter_options(letters: list[str]) -> str:
     return ", ".join(letters[:-1]) + f", or {letters[-1]}"
 
 
+def _render_stepwise_answer_format(letters: list[str], final_placeholder: str) -> str:
+    """
+    Render a stepwise answer format that first lists per-image labels,
+    then provides a final answer line.
+    """
+    lines = [f"{ltr}: {{label}}" for ltr in letters]
+    lines.append(f"Final: {final_placeholder}")
+    return "Answer in the following format:\n<answer>\n" + "\n".join(lines) + "\n</answer>"
+
+
 def _render_images(letters: list[str]) -> str:
     return "\n".join([f"({l}) Image {l}: <image>" for l in letters])
 
@@ -580,8 +590,9 @@ def gen_b1_target_search(rng: random.Random, *, by_label: dict[str, list[VqaItem
         f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
         f"{_render_images(letters)}\n\n"
         f"Task (B1 Target-search): Exactly one image shows **{target_label}**. Which image is it?\n\n"
-        "Answer with only one letter.\n"
-        f"<answer> {_letter_options(letters)} </answer>"
+        "First, identify the condition shown in each image.\n"
+        f"Final must be one letter: {_letter_options(letters)}.\n"
+        + _render_stepwise_answer_format(letters, "{one letter}")
     )
 
     return {
@@ -622,8 +633,9 @@ def gen_b2_odd_one_out(rng: random.Random, *, by_label: dict[str, list[VqaItem]]
         f"{_render_images(letters)}\n\n"
         f"Task (B2 Odd-one-out): Exactly {k-1} images depict the same condition and 1 image depicts a different condition.\n"
         "Which image is the odd one out?\n\n"
-        "Answer with only one letter.\n"
-        f"<answer> {_letter_options(letters)} </answer>"
+        "First, identify the condition shown in each image.\n"
+        f"Final must be one letter: {_letter_options(letters)}.\n"
+        + _render_stepwise_answer_format(letters, "{one letter}")
     )
 
     return {
@@ -738,8 +750,9 @@ def gen_b4_exemplar_match(rng: random.Random, *, by_label: dict[str, list[VqaIte
         + "\n\n"
         f"Task (B4 Exemplar-match): Exactly one candidate depicts the same condition as the reference image {ref_letter}.\n"
         "Which candidate is it?\n\n"
-        "Answer with only one letter.\n"
-        f"<answer> {_letter_options(cand_letters)} </answer>"
+        "First, identify the condition shown in each image (including the reference).\n"
+        f"Final must be one letter: {_letter_options(cand_letters)}.\n"
+        + _render_stepwise_answer_format(letters, "{one letter}")
     )
 
     return {
@@ -777,13 +790,15 @@ def gen_b5_same_different(rng: random.Random, *, by_label: dict[str, list[VqaIte
         correct = "different" if a_lbl != b_lbl else "same"
         used = [a, b]
 
+    letters = ["A", "B"]
     prompt = (
         "You are a medical VQA assistant.\n\n"
         "(A) Image A: <image>\n"
         "(B) Image B: <image>\n\n"
         "Task (B5 Same/Different): Do these two images depict the same condition?\n\n"
-        "Answer with exactly one token: 'same' or 'different'.\n"
-        "<answer> same or different </answer>"
+        "First, identify the condition shown in each image.\n"
+        "Final must be exactly one token: same or different.\n"
+        + _render_stepwise_answer_format(letters, "{same|different}")
     )
 
     return {
@@ -834,8 +849,9 @@ def gen_b6_pair_finding(rng: random.Random, *, by_label: dict[str, list[VqaItem]
         f"{_render_images(letters)}\n\n"
         "Task (B6 Pair-finding): Exactly two images depict the same condition; all other images depict different conditions.\n"
         "Identify the two matching images.\n\n"
-        "Answer with exactly two letters separated by a space (order does not matter).\n"
-        "<answer> A B </answer>"
+        "First, identify the condition shown in each image.\n"
+        "Final must be exactly two letters separated by a space (order does not matter).\n"
+        + _render_stepwise_answer_format(letters, "{two letters}")
     )
 
     return {

@@ -91,21 +91,17 @@ def _to_canonical_label(text: str, *, candidate_labels: Optional[list[str]] = No
     if not s:
         return None
 
-    # 1) Exact match against synonyms table.
-    if s in _SYN2CANON:
-        return _SYN2CANON[s]
-
-    # 2) If candidate labels exist, prefer matching to exactly one candidate (exact or unique substring).
     if candidate_labels:
         cand = [c.strip() for c in candidate_labels if isinstance(c, str) and c.strip()]
         cand_norm = {_norm_text(c): c for c in cand}
+        allowed = {_SYN2CANON.get(_norm_text(c), c) for c in cand}
 
-        # 2.1 exact match to a candidate surface form
+        # 1) Exact match to a candidate surface form.
         if s in cand_norm:
             c = cand_norm[s]
             return _SYN2CANON.get(_norm_text(c), c)
 
-        # 2.2 unique candidate substring match (allows "this is melanoma" style responses)
+        # 2) Unique candidate substring match (allows "this is melanoma" style responses).
         hay = f" {s} "
         present: list[str] = []
         for c in cand:
@@ -119,7 +115,26 @@ def _to_canonical_label(text: str, *, candidate_labels: Optional[list[str]] = No
             c = present_uniq[0]
             return _SYN2CANON.get(_norm_text(c), c)
 
-    # 3) Unique synonym substring match (fallback; conservative).
+        # 3) Exact synonym match but restricted to allowed candidates.
+        if s in _SYN2CANON and _SYN2CANON[s] in allowed:
+            return _SYN2CANON[s]
+
+        # 4) Unique synonym substring match restricted to allowed candidates.
+        matches: list[str] = []
+        for syn_norm, canon in _SYN2CANON.items():
+            if canon not in allowed:
+                continue
+            if syn_norm and f" {syn_norm} " in hay:
+                matches.append(canon)
+        uniq = sorted(set(matches))
+        if len(uniq) == 1:
+            return uniq[0]
+        return None
+
+    # No candidates provided: fall back to global canonicalization.
+    if s in _SYN2CANON:
+        return _SYN2CANON[s]
+
     hay = f" {s} "
     matches: list[str] = []
     for syn_norm, canon in _SYN2CANON.items():

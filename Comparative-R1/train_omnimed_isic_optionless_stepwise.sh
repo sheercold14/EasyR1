@@ -12,9 +12,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EASYR1_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-REPO_ROOT="$(cd "${EASYR1_ROOT}/.." && pwd)"
+EASYR1_ROOT="/mnt/cache/wuruixiao/users/lsc/EasyR1"
+REPO_ROOT="/mnt/cache/wuruixiao/users/lsc"
 
 pick_existing_dir() {
   for d in "$@"; do
@@ -28,16 +27,13 @@ pick_existing_dir() {
 }
 
 # ===== Paths =====
-MODEL_PATH=${MODEL_PATH:-"Qwen/Qwen2.5-7B-Instruct"}
+MODEL_PATH=${MODEL_PATH:-"/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b"}
 DATA_DIR=${DATA_DIR:-"${EASYR1_ROOT}/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05"}
-TRAIN_FILE=${TRAIN_FILE:-"${DATA_DIR}/train_btasks+fewshot0.5_optionless.jsonl"}
+TRAIN_FILE=${TRAIN_FILE:-"${DATA_DIR}/train_fewshot_0.5_optionless.jsonl"}
 VAL_FILE=${VAL_FILE:-"${DATA_DIR}/test_optionless.jsonl"}
 
-DEFAULT_OMNI_ROOT="$(pick_existing_dir \
-  "${EASYR1_ROOT}/data/OmniMedVQA" \
-  "${EASYR1_ROOT}/data/omnimedvqa" \
-  "${REPO_ROOT}/data/OmniMedVQA")"
-OMNI_ROOT=${OMNI_ROOT:-"${DEFAULT_OMNI_ROOT}"}
+
+OMNI_ROOT=${OMNI_ROOT:-"${REPO_ROOT}/data/OmniMedVQA"}
 
 CONFIG=${CONFIG:-"${EASYR1_ROOT}/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml"}
 FORMAT_PROMPT=${FORMAT_PROMPT:-"${EASYR1_ROOT}/Comparative-R1/prompts/omnimed_isic.jinja"}
@@ -49,7 +45,7 @@ BATCH_SIZE=${BATCH_SIZE:-32}
 N_SAMPLES=${N_SAMPLES:-4}
 TEMPERATURE=${TEMPERATURE:-0.7}
 SAVE_FREQ=${SAVE_FREQ:-5}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_optionless_stepwise_n${N_SAMPLES}_t${TEMPERATURE}"}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_optionless_single_n${N_SAMPLES}_t${TEMPERATURE}"}
 
 # ===== Task-aware advantage (override config in this script) =====
 # Recommended: keep enabled for multi-task stability.

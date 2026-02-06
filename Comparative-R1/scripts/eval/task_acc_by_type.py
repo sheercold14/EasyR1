@@ -15,7 +15,7 @@ Correctness is determined in the following priority:
 
 Example:
   python EasyR1/Comparative-R1/scripts/eval/task_acc_by_type.py \
-    --run-dir /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/eval_runs/isic_pretrain_optionless_test
+    --run-dir /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/eval_runs/isic_b1800_optionless_val
 """
 
 from __future__ import annotations

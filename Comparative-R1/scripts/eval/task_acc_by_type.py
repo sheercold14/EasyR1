@@ -14,8 +14,8 @@ Correctness is determined in the following priority:
   3) fallback: compare record["output"] vs ground_truth["correct_answer"]
 
 Example:
-  python EasyR1/Comparative-R1/scripts/eval/task_acc_by_type.py \\
-    --run-dir EasyR1/checkpoints/eval_runs/isic_taskaware_step_v1_val_7_100_btasks
+  python EasyR1/Comparative-R1/scripts/eval/task_acc_by_type.py \
+    --run-dir /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/eval_runs/isic_pretrain_optionless_test
 """
 
 from __future__ import annotations

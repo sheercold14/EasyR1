@@ -1,0 +1,18 @@
+Two-stage output requirement (for analysis only):
+1) First, independently infer the medical condition label for EACH image.
+   Output a single JSON object inside <labels_json>...</labels_json> that maps image keys to predicted labels.
+   - Use the exact image keys shown in the prompt (e.g., A, B, C, D, ...; for query images use Q if present).
+   - Each value should be a short free-text label (no extra explanation).
+2) Then answer the original task. Put ONLY the final answer in <answer>...</answer> as instructed.
+
+Expected image keys: {KEYS}
+Example JSON skeleton: {EXAMPLE_JSON}
+
+Important:
+- Your response MUST start with <labels_json> and MUST include keys for ALL images listed above.
+- Do NOT output <answer> until after you finish <labels_json>.
+- If you are unsure about a label, still make your best guess (do not leave any value empty).
+
+Output format (no code fences, no extra text outside the tags):
+<labels_json>{"A":"...","B":"..."} </labels_json>
+<answer> ... </answer>

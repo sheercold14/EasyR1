@@ -1,0 +1,29 @@
+{
+  "output": "EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/test_b2_tasks_200.jsonl",
+  "info": {
+    "seed": 123,
+    "label_space_by": "question_type+optioncount",
+    "k": 4,
+    "b4_candidates": 3,
+    "b5_same_prob": 0.5,
+    "b7_nway": 3,
+    "requested": {
+      "B1": 0,
+      "B2": 200,
+      "B3": 0,
+      "B4": 0,
+      "B5": 0,
+      "B6": 0,
+      "B7": 0
+    },
+    "generated": 200,
+    "task_failures": {},
+    "num_label_spaces": 2
+  },
+  "tasks": [
+    [
+      "B2_odd_one_out",
+      200
+    ]
+  ]
+}

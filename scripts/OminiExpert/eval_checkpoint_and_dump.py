@@ -22,17 +22,18 @@ Example (mcq single-image file, keep all):
 
 python3 EasyR1/scripts/OminiExpert/eval_checkpoint_and_dump.py \
   --config EasyR1/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml \
-  --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/comparative_r1/omnimed_isic_btasks_n4_t0.7_taskaware/global_step_355 \
-  --val /mnt/cache/wuruixiao/users/lsc/EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v0_0.05/val_btasks_210.jsonl \
-  --out /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/eval_runs/isic_step355_val_btasks_210 \
+  --val EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test.jsonl \
+  --out EasyR1/checkpoints/eval_runs/isic_pretrain_test \
   --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
-Example (multi-image B tasks you generated separately):
+
   python EasyR1/scripts/OminiExpert/eval_checkpoint_and_dump.py \
     --config EasyR1/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml \
-    --checkpoint EasyR1/checkpoints/comparative_r1/omnimed_isic_btasks_v1_n4_t0.7_taskaware/global_step_650 \
+    --checkpoint EasyR1/checkpoints/comparative_r1/omnimed_isic_v1_single_n4_t0.7/global_step_285 \
     --val EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/test_b_tasks_7_100.jsonl \
-    --out EasyR1/checkpoints/eval_runs/isic_taskaware_step_v1_val_7_100_btasks \
+    --out EasyR1/checkpoints/eval_runs/isic_single_v1_val_7_100_btasks \
     --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
+
+
 """
 
 from __future__ import annotations
@@ -121,7 +122,7 @@ def parse_generations_log(path: Path) -> list[GenSample]:
 def run_val_only(
     *,
     config: Path,
-    checkpoint: Path,
+    checkpoint: Optional[Path],
     val_jsonl: Path,
     out_dir: Path,
     experiment_name: str,
@@ -141,10 +142,11 @@ def run_val_only(
         # write outputs into a separate folder
         f"trainer.save_checkpoint_path={out_dir}",
         f"trainer.experiment_name={experiment_name}",
-        # load the specific checkpoint
-        f"trainer.load_checkpoint_path={checkpoint}",
+        # always avoid auto-finding a checkpoint in out_dir
         "trainer.find_last_checkpoint=false",
     ]
+    if checkpoint is not None:
+        overrides.append(f"trainer.load_checkpoint_path={checkpoint}")
     overrides.extend(extra_overrides)
 
     cmd = ["python3", "-m", "verl.trainer.main", *overrides]
@@ -154,7 +156,12 @@ def run_val_only(
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", type=Path, required=True, help="A training config YAML (used for model/rollout/reward).")
-    ap.add_argument("--checkpoint", type=Path, required=True, help="Checkpoint dir ending with global_step_*.")
+    ap.add_argument(
+        "--checkpoint",
+        type=Path,
+        default=None,
+        help="Optional checkpoint dir ending with global_step_*. If omitted, evaluates the base model from config/overrides.",
+    )
     ap.add_argument("--val", type=Path, required=True, help="Eval JSONL (single-image or B tasks).")
     ap.add_argument("--out", type=Path, required=True, help="Output dir for eval logs and dumps.")
     ap.add_argument("--name", type=str, default=None, help="Optional experiment name override.")
@@ -167,18 +174,19 @@ def main() -> None:
     args = ap.parse_args()
 
     config = args.config.resolve()
-    checkpoint = args.checkpoint.resolve()
+    checkpoint = args.checkpoint.resolve() if args.checkpoint is not None else None
     val_jsonl = args.val.resolve()
     out_dir = args.out.resolve()
 
     if not config.exists():
         raise SystemExit(f"Missing --config: {config}")
-    if not checkpoint.exists():
+    if checkpoint is not None and not checkpoint.exists():
         raise SystemExit(f"Missing --checkpoint: {checkpoint}")
     if not val_jsonl.exists():
         raise SystemExit(f"Missing --val: {val_jsonl}")
 
-    exp_name = args.name or f"eval_{checkpoint.name}_{val_jsonl.stem}"
+    ckpt_name = checkpoint.name if checkpoint is not None else "pretrained"
+    exp_name = args.name or f"eval_{ckpt_name}_{val_jsonl.stem}"
 
     run_val_only(
         config=config,
@@ -224,4 +232,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

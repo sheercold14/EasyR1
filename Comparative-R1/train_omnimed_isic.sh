@@ -17,9 +17,9 @@ EASYR1_ROOT="/mnt/cache/wuruixiao/users/lsc/EasyR1"
 REPO_ROOT="/mnt/cache/wuruixiao/users/lsc/"
 # ===== Paths =====
 MODEL_PATH=${MODEL_PATH:-"/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b"}
-DATA_DIR=${DATA_DIR:-"${EASYR1_ROOT}/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05"}
-TRAIN_FILE=${TRAIN_FILE:-"${DATA_DIR}/train_fewshot_0.5.jsonl"}
-VAL_FILE=${VAL_FILE:-"${DATA_DIR}/test.jsonl"}
+DATA_DIR=${DATA_DIR:-"${EASYR1_ROOT}/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative"}
+TRAIN_FILE=${TRAIN_FILE:-"${DATA_DIR}/train_b1_tasks_800.jsonl"}
+VAL_FILE=${VAL_FILE:-"${DATA_DIR}/test_b1_tasks_200.jsonl"}
 OMNI_ROOT=${OMNI_ROOT:-"${REPO_ROOT}/data/OmniMedVQA"}
 
 CONFIG=${CONFIG:-"${EASYR1_ROOT}/Comparative-R1/configs/omnimed_isic_gspo.yaml"}
@@ -33,7 +33,7 @@ N_SAMPLES=${N_SAMPLES:-4}
 TEMPERATURE=${TEMPERATURE:-0.7}
 SAVE_FREQ=${SAVE_FREQ:-5}
 
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_v1_single_n${N_SAMPLES}_t${TEMPERATURE}"}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_v1_b1_800_n${N_SAMPLES}_t${TEMPERATURE}"}
 
 echo "=========================================="
 echo "OminiMedExpert ISIC Training (GSPO/GRPO)"

@@ -68,9 +68,9 @@ Generate a new `jsonl` with B1–B7 tasks from a base `train.jsonl` (or the few-
 ```bash
 python EasyR1/scripts/OminiExpert/omnimed_expert.py build-comparative \
   --input EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test.jsonl \
-  --output EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/test_b_tasks_7_100.jsonl \
+  --output EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/test_b1_tasks_200.jsonl \
   --label-space-by question_type+optioncount \
-  --task B1=100 --task B2=100 --task B3=100 --task B4=100 --task B5=100 --task B6=100 --task B7=100 \
+  --task B1=200 --task B2=0 --task B3=0 --task B4=0 --task B5=0 --task B6=0 --task B7=0 \
   --k 4 \
   --b4-candidates 3 \
   --b7-nway 3 \

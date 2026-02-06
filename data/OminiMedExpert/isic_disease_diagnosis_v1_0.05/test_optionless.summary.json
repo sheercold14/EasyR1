@@ -1,0 +1,27 @@
+{
+  "input": "data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test.jsonl",
+  "output": "data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test_optionless.jsonl",
+  "total_input_rows": 907,
+  "total_output_rows": 907,
+  "info": {
+    "rewritten_mcq": 907,
+    "skipped_invalid_prompt": 0,
+    "num_groups": 2,
+    "labels_by_group": {
+      "Disease Diagnosis|binary_benign_malignant": [
+        "Benign",
+        "Malignant"
+      ],
+      "Disease Diagnosis|option_count=4": [
+        "Actinic keratosis",
+        "Basal cell carcinoma",
+        "Benign keratosis",
+        "Dermatofibroma",
+        "Melanocytic nevus",
+        "Melanoma",
+        "Squamous cell carcinoma",
+        "Vascular lesion"
+      ]
+    }
+  }
+}

@@ -136,3 +136,31 @@ python EasyR1/Comparative-R1/scripts/mix_jsonl_datasets.py \
   --output EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_btasks+fewshot0.5_optionless_shuf_seed42.jsonl \
   --shuffle --seed 42
 ```
+
+## 7) Unified one-shot interface (config-driven)
+
+Use one command to do:
+- single-image -> optionless rewrite
+- B-task input or B-task generation
+- ratio-based mix (optional total sampling)
+- shuffle
+- summary + output paths
+
+Command:
+
+```bash
+python EasyR1/scripts/OminiExpert/omnimed_expert.py build-train-mix \
+  --config EasyR1/scripts/OminiExpert/configs/isic_train_mix_optionless.yaml
+```
+
+Template config:
+- `EasyR1/scripts/OminiExpert/configs/isic_train_mix_optionless.yaml`
+
+Key fields:
+- `single_input`: single-image input JSONL
+- `btasks_input` or `generate_btasks`: choose B-task source
+- `mix.ratio.single` / `mix.ratio.btask`: data proportion (used when `mix.total` is set)
+- `mix.shuffle`: whether to shuffle final output
+- `output_train`: final mixed train path
+- `output_summary`: summary path
+- `output_single_optionless` / `output_btasks`: optional intermediate dumps

@@ -1,0 +1,74 @@
+{
+  "config": "/data/shichao/EasyR1/scripts/OminiExpert/configs/isic_train_mix_optionless.yaml",
+  "single_input": "/data/shichao/EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5.jsonl",
+  "single_rows_input": 877,
+  "single_rows_optionless": 877,
+  "optionless_info": {
+    "rewritten_mcq": 877,
+    "skipped_invalid_prompt": 0,
+    "num_groups": 2,
+    "labels_by_group": {
+      "Disease Diagnosis|binary_benign_malignant": [
+        "Benign",
+        "Malignant"
+      ],
+      "Disease Diagnosis|option_count=4": [
+        "Actinic keratosis",
+        "Basal cell carcinoma",
+        "Benign keratosis",
+        "Dermatofibroma",
+        "Melanocytic nevus",
+        "Melanoma",
+        "Squamous cell carcinoma",
+        "Vascular lesion"
+      ]
+    }
+  },
+  "btask_source": "generated",
+  "btask_rows": 700,
+  "btask_info": {
+    "seed": 42,
+    "label_space_by": "question_type+optioncount",
+    "k": 4,
+    "b4_candidates": 3,
+    "b5_same_prob": 0.5,
+    "b7_nway": 3,
+    "requested": {
+      "B1": 100,
+      "B2": 100,
+      "B3": 100,
+      "B4": 100,
+      "B5": 100,
+      "B6": 100,
+      "B7": 100
+    },
+    "generated": 700,
+    "task_failures": {},
+    "num_label_spaces": 2
+  },
+  "mix": {
+    "mode": "concat_all",
+    "picked": {
+      "single": 877,
+      "btask": 700,
+      "total": 1577
+    },
+    "note": "ratio ignored when mix.total is null"
+  },
+  "shuffle": {
+    "enabled": true,
+    "seed": 42
+  },
+  "output_train": "/data/shichao/EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_btasks+fewshot0.5_optionless.jsonl",
+  "output_rows": 1577,
+  "task_type_counts": {
+    "mcq_optionless_text": 877,
+    "B3_label_corruption": 100,
+    "B7_support_set_nway": 100,
+    "B6_pair_finding": 100,
+    "B2_odd_one_out": 100,
+    "B5_same_different": 100,
+    "B4_exemplar_match": 100,
+    "B1_target_search": 100
+  }
+}

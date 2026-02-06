@@ -10,6 +10,7 @@ This script supports:
   5) Writing EasyR1-compatible JSONL with `Images/...` relative image paths
   6) Rewriting single-image MCQ rows to optionless label-text rows
   7) Expanding train data into multi-image comparative tasks (B1–B7)
+  8) One-shot mixed-train build via config (optionless + B tasks + ratio/shuffle/summary)
 
 Default paths assume this repo layout:
   <repo_root>/data/OmniMedVQA
@@ -52,8 +53,8 @@ PATIENT_LIKE_KEYS: tuple[str, ...] = (
 
 
 def _repo_root() -> Path:
-    # EasyR1/scripts/OminiExpert/omnimed_expert.py -> parents[3] == <repo_root>
-    return Path(__file__).resolve().parents[3]
+    # .../EasyR1/scripts/OminiExpert/omnimed_expert.py -> parents[2] == .../EasyR1
+    return Path(__file__).resolve().parents[2]
 
 
 def _default_omni_root() -> Path:
@@ -105,6 +106,48 @@ def _write_jsonl(path: Path, rows: Iterable[dict]) -> None:
     with path.open("w", encoding="utf-8") as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _load_structured_config(path: Path) -> dict:
+    """
+    Load JSON/YAML config for one-shot data build pipelines.
+    """
+    txt = path.read_text(encoding="utf-8")
+    suf = path.suffix.lower()
+    if suf == ".json":
+        obj = json.loads(txt)
+    else:
+        try:
+            import yaml  # type: ignore
+        except Exception as exc:
+            raise RuntimeError("YAML config requires PyYAML. Install it or use .json config.") from exc
+        obj = yaml.safe_load(txt)
+    if not isinstance(obj, dict):
+        raise ValueError(f"Config root must be an object/dict: {path}")
+    return obj
+
+
+def _cfg_path(value: object, *, base_dir: Path) -> Path:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Expected non-empty string path in config")
+    p = Path(value.strip()).expanduser()
+    if not p.is_absolute():
+        # Prefer repo-root relative paths for portability across invocation dirs.
+        # Fallback to CWD / config-dir when the relative input exists there.
+        repo_candidate = (_repo_root() / p).resolve()
+        cwd_candidate = (Path.cwd() / p).resolve()
+        cfg_candidate = (base_dir / p).resolve()
+
+        if repo_candidate.exists():
+            return repo_candidate
+        if cwd_candidate.exists():
+            return cwd_candidate
+        if cfg_candidate.exists():
+            return cfg_candidate
+
+        # For outputs that do not exist yet, default to repo-root relative.
+        return repo_candidate
+    return p
 
 
 def discover_omnimedvqa_datasets(omni_root: Path) -> dict[str, Path]:
@@ -1094,6 +1137,82 @@ def _parse_task_specs(raw_specs: list[str]) -> dict[TaskName, int]:
     return out
 
 
+def _task_counts_from_dict(obj: dict) -> dict[TaskName, int]:
+    """
+    Parse task counts from config style:
+      task_counts:
+        B1: 800
+        B2: 800
+    """
+    out: dict[TaskName, int] = {}
+    for k, v in obj.items():
+        name = str(k).strip().upper()
+        if name not in {"B1", "B2", "B3", "B4", "B5", "B6", "B7"}:
+            raise ValueError(f"Unknown task name in config: {k!r}")
+        try:
+            count = int(v)
+        except Exception as exc:
+            raise ValueError(f"Invalid task count for {name}: {v!r}") from exc
+        if count < 0:
+            raise ValueError(f"Task count must be >= 0 for {name}, got {count}")
+        out[name] = count  # type: ignore[assignment]
+    return out
+
+
+def _sample_rows_with_ratio(
+    *,
+    single_rows: list[dict],
+    btask_rows: list[dict],
+    single_ratio: float,
+    btask_ratio: float,
+    total: int,
+    seed: int,
+) -> tuple[list[dict], dict]:
+    if total <= 0:
+        raise ValueError("mix.total must be > 0")
+    if single_ratio < 0 or btask_ratio < 0:
+        raise ValueError("mix.ratio.* must be >= 0")
+    if single_ratio + btask_ratio <= 0:
+        raise ValueError("mix.ratio.single + mix.ratio.btask must be > 0")
+
+    s = single_ratio / (single_ratio + btask_ratio)
+    b = btask_ratio / (single_ratio + btask_ratio)
+    n_single = int(round(total * s))
+    n_single = max(0, min(total, n_single))
+    n_btask = total - n_single
+
+    if n_single > 0 and len(single_rows) == 0:
+        raise ValueError("Requested single rows in mix, but single_rows is empty")
+    if n_btask > 0 and len(btask_rows) == 0:
+        raise ValueError("Requested btask rows in mix, but btask_rows is empty")
+
+    rng = random.Random(seed)
+
+    oversample_single = n_single > len(single_rows)
+    oversample_btask = n_btask > len(btask_rows)
+
+    if oversample_single:
+        picked_single = [rng.choice(single_rows) for _ in range(n_single)] if single_rows else []
+    else:
+        picked_single = rng.sample(single_rows, n_single) if n_single > 0 else []
+
+    if oversample_btask:
+        picked_btask = [rng.choice(btask_rows) for _ in range(n_btask)] if btask_rows else []
+    else:
+        picked_btask = rng.sample(btask_rows, n_btask) if n_btask > 0 else []
+
+    out = [*picked_single, *picked_btask]
+    info = {
+        "mode": "ratio+total",
+        "requested_total": total,
+        "requested_ratio": {"single": single_ratio, "btask": btask_ratio},
+        "normalized_ratio": {"single": s, "btask": b},
+        "picked": {"single": len(picked_single), "btask": len(picked_btask), "total": len(out)},
+        "oversample": {"single": oversample_single, "btask": oversample_btask},
+    }
+    return out, info
+
+
 def build_label_spaces(rows: Iterable[dict], by: LabelSpaceBy) -> dict[str, list[VqaItem]]:
     spaces: dict[str, list[VqaItem]] = defaultdict(list)
     for r in rows:
@@ -1376,6 +1495,164 @@ def cmd_build_optionless(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
+def cmd_build_train_mix(args: argparse.Namespace) -> None:
+    """
+    One-shot pipeline:
+      1) read single-image source rows
+      2) convert single rows to optionless text-label format
+      3) read/generate B tasks
+      4) mix with ratio + optional total sampling
+      5) optional shuffle, write output + summary
+    """
+    cfg_path = args.config.resolve()
+    if not cfg_path.exists():
+        raise SystemExit(f"Missing --config: {cfg_path}")
+    cfg = _load_structured_config(cfg_path)
+    base_dir = cfg_path.parent
+
+    # -------- required paths --------
+    single_input = _cfg_path(cfg.get("single_input"), base_dir=base_dir)
+    output_train = _cfg_path(cfg.get("output_train"), base_dir=base_dir)
+    output_train.parent.mkdir(parents=True, exist_ok=True)
+    output_summary = cfg.get("output_summary", None)
+    if output_summary is None:
+        summary_path = output_train.parent / f"{output_train.stem}.summary.json"
+    else:
+        summary_path = _cfg_path(output_summary, base_dir=base_dir)
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not single_input.exists():
+        raise SystemExit(f"single_input not found: {single_input}")
+
+    # -------- single rows -> optionless --------
+    single_rows_raw = list(_read_jsonl(single_input))
+    single_rows_opt, optionless_info = transform_rows_to_optionless(single_rows_raw)
+
+    # Optional intermediate dumps.
+    output_single_optionless = cfg.get("output_single_optionless", None)
+    if output_single_optionless is not None:
+        p = _cfg_path(output_single_optionless, base_dir=base_dir)
+        _write_jsonl(p, single_rows_opt)
+
+    # -------- B tasks source (read existing or generate) --------
+    b_rows: list[dict] = []
+    b_source: str = "none"
+    if cfg.get("btasks_input", None) is not None:
+        b_input = _cfg_path(cfg.get("btasks_input"), base_dir=base_dir)
+        if not b_input.exists():
+            raise SystemExit(f"btasks_input not found: {b_input}")
+        b_rows = list(_read_jsonl(b_input))
+        b_source = f"input:{b_input}"
+        b_info: dict = {"mode": "input", "rows": len(b_rows)}
+    else:
+        gen_b = bool(cfg.get("generate_btasks", False))
+        if not gen_b:
+            b_rows = []
+            b_source = "disabled"
+            b_info = {"mode": "disabled", "rows": 0}
+        else:
+            bcfg = cfg.get("btasks", {})
+            if not isinstance(bcfg, dict):
+                raise SystemExit("`btasks` must be a dict in config when generate_btasks=true")
+
+            task_counts_raw = bcfg.get("task_counts", {})
+            if not isinstance(task_counts_raw, dict):
+                raise SystemExit("`btasks.task_counts` must be a dict")
+            task_counts = _task_counts_from_dict(task_counts_raw)
+            if not task_counts:
+                raise SystemExit("`btasks.task_counts` is empty")
+
+            label_space_by = str(bcfg.get("label_space_by", "question_type+optioncount"))
+            seed = int(bcfg.get("seed", 42))
+            k = int(bcfg.get("k", 4))
+            b4_candidates = int(bcfg.get("b4_candidates", 3))
+            b5_same_prob = float(bcfg.get("b5_same_prob", 0.5))
+            b7_nway = int(bcfg.get("b7_nway", 5))
+            no_shuffle = bool(bcfg.get("no_shuffle", False))
+
+            b_rows, b_info = generate_b_tasks(
+                single_rows_raw,
+                seed=seed,
+                label_space_by=label_space_by,  # type: ignore[arg-type]
+                task_counts=task_counts,
+                k=k,
+                b4_candidates=b4_candidates,
+                b5_same_prob=b5_same_prob,
+                b7_nway=b7_nway,
+                shuffle=not no_shuffle,
+            )
+            b_source = "generated"
+
+    output_btasks = cfg.get("output_btasks", None)
+    if output_btasks is not None:
+        p = _cfg_path(output_btasks, base_dir=base_dir)
+        _write_jsonl(p, b_rows)
+
+    # -------- mixing --------
+    mix_cfg = cfg.get("mix", {})
+    if not isinstance(mix_cfg, dict):
+        raise SystemExit("`mix` must be a dict in config")
+
+    mix_seed = int(mix_cfg.get("seed", 42))
+    mix_shuffle = bool(mix_cfg.get("shuffle", True))
+    total_obj = mix_cfg.get("total", None)
+
+    if total_obj is None:
+        mixed_rows = [*single_rows_opt, *b_rows]
+        mix_info = {
+            "mode": "concat_all",
+            "picked": {"single": len(single_rows_opt), "btask": len(b_rows), "total": len(mixed_rows)},
+            "note": "ratio ignored when mix.total is null",
+        }
+    else:
+        total = int(total_obj)
+        ratio_cfg = mix_cfg.get("ratio", {})
+        if not isinstance(ratio_cfg, dict):
+            raise SystemExit("`mix.ratio` must be a dict")
+        single_ratio = float(ratio_cfg.get("single", 0.5))
+        btask_ratio = float(ratio_cfg.get("btask", 0.5))
+        mixed_rows, mix_info = _sample_rows_with_ratio(
+            single_rows=single_rows_opt,
+            btask_rows=b_rows,
+            single_ratio=single_ratio,
+            btask_ratio=btask_ratio,
+            total=total,
+            seed=mix_seed,
+        )
+
+    if mix_shuffle:
+        rng = random.Random(mix_seed)
+        rng.shuffle(mixed_rows)
+
+    _write_jsonl(output_train, mixed_rows)
+
+    task_counter = Counter()
+    for r in mixed_rows:
+        ans = r.get("answer")
+        if isinstance(ans, dict):
+            task_counter[str(ans.get("task_type", "unknown"))] += 1
+        else:
+            task_counter["unknown"] += 1
+
+    summary = {
+        "config": str(cfg_path),
+        "single_input": str(single_input),
+        "single_rows_input": len(single_rows_raw),
+        "single_rows_optionless": len(single_rows_opt),
+        "optionless_info": optionless_info,
+        "btask_source": b_source,
+        "btask_rows": len(b_rows),
+        "btask_info": b_info,
+        "mix": mix_info,
+        "shuffle": {"enabled": mix_shuffle, "seed": mix_seed},
+        "output_train": str(output_train),
+        "output_rows": len(mixed_rows),
+        "task_type_counts": dict(task_counter),
+    }
+    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="OmniMedVQA benchmark builder + Comparative-RFT tasks (B1–B7)")
     p.add_argument("--omni_root", type=Path, default=_default_omni_root(), help="Path to OmniMedVQA root dir")
@@ -1430,6 +1707,18 @@ def build_argparser() -> argparse.ArgumentParser:
     p_opt.add_argument("--output", type=Path, required=True, help="Output JSONL path")
     p_opt.add_argument("--summary", type=Path, default=None, help="Optional summary JSON path")
     p_opt.set_defaults(func=cmd_build_optionless)
+
+    p_mix = sub.add_parser(
+        "build-train-mix",
+        help="One-shot build: single->optionless + B tasks (input/generate) + ratio mix + shuffle + summary",
+    )
+    p_mix.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="YAML/JSON config path for the unified pipeline",
+    )
+    p_mix.set_defaults(func=cmd_build_train_mix)
 
     return p
 

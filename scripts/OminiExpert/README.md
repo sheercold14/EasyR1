@@ -86,3 +86,53 @@ Each generated sample includes:
 
 Note on prompts: B1/B2/B4/B5/B6 now ask the model to first output each image's label (e.g., `A: Melanoma`),
 then provide a final answer line (`Final: ...`) inside `<answer>...</answer>`. B3/B7 remain single-letter.
+
+## 5) Rewrite single-image MCQ to optionless label-text
+
+If you want single-image training to use candidate vocab + label text output (instead of MCQ letter), run:
+
+```bash
+python EasyR1/scripts/OminiExpert/omnimed_expert.py build-optionless \
+  --input EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5.jsonl \
+  --output EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5_optionless.jsonl
+```
+
+Behavior:
+- only `answer.task_type == "mcq_letter"` rows are rewritten to `mcq_optionless_text`
+- candidate labels are grouped per task key, aligned with `eval_optionless_checkpoint_and_dump.py`
+- B1-B7 rows are passed through unchanged
+
+## 6) End-to-end regeneration pipeline (optionless single-image + unchanged B tasks)
+
+```bash
+# 1) Build base single-image set (mcq_letter)
+python EasyR1/scripts/OminiExpert/omnimed_expert.py build-base \
+  --datasets ISIC2018 ISIC2019 ISIC2020 \
+  --question-type "Disease Diagnosis" \
+  --min-option-count 2 --max-option-count 4 \
+  --split 0.7,0.0,0.3 \
+  --seed 42 \
+  --skip-missing-images \
+  --fewshot-ratio 0.5 \
+  --out-dir EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05
+
+# 2) Build B tasks from few-shot train (B tasks not changed)
+python EasyR1/scripts/OminiExpert/omnimed_expert.py build-comparative \
+  --input EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5.jsonl \
+  --output EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/train_b_tasks.jsonl \
+  --label-space-by question_type+optioncount \
+  --task B1=800 --task B2=800 --task B3=800 --task B4=800 --task B5=800 --task B6=800 --task B7=800 \
+  --k 4 --b4-candidates 3 --b7-nway 3 --seed 42
+
+# 3) Rewrite only single-image rows to optionless
+python EasyR1/scripts/OminiExpert/omnimed_expert.py build-optionless \
+  --input EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5.jsonl \
+  --output EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5_optionless.jsonl
+
+# 4) Mix optionless single-image + comparative B tasks
+python EasyR1/Comparative-R1/scripts/mix_jsonl_datasets.py \
+  --inputs EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_fewshot_0.5_optionless.jsonl \
+  --inputs EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/comparative/train_b_tasks.jsonl \
+  --output EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/train_btasks+fewshot0.5_optionless_shuf_seed42.jsonl \
+  --shuffle --seed 42
+```

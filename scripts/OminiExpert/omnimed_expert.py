@@ -8,7 +8,8 @@ This script supports:
   3) Train/val/test splitting with leak-avoidance via grouping keys
   4) Few-shot sampling from train with per-label balancing
   5) Writing EasyR1-compatible JSONL with `Images/...` relative image paths
-  6) Expanding train data into multi-image comparative tasks (B1–B7)
+  6) Rewriting single-image MCQ rows to optionless label-text rows
+  7) Expanding train data into multi-image comparative tasks (B1–B7)
 
 Default paths assume this repo layout:
   <repo_root>/data/OmniMedVQA
@@ -177,6 +178,7 @@ def resolve_image_path(omni_root: Path, root_rel_path: str) -> Path:
 
 
 _SLICE_RE = re.compile(r"^(?P<prefix>.+)_(?P<axis>[xyz])_(?P<idx>\\d+)$", flags=re.IGNORECASE)
+_OPTIONLESS_QUESTION_RE = re.compile(r"^\s*Question\s*:\s*(?P<q>.+?)\s*$", flags=re.IGNORECASE | re.MULTILINE)
 
 
 def default_group_id(dataset: str, root_rel_image_path: str) -> str:
@@ -357,6 +359,152 @@ def fewshot_balanced_by_label(rows: list[dict], *, ratio: float, seed: int) -> l
 
     rng.shuffle(out)
     return out
+
+
+def _extract_question_from_prompt(prompt: str) -> str:
+    m = _OPTIONLESS_QUESTION_RE.search(prompt)
+    if not m:
+        return ""
+    return m.group("q").strip()
+
+
+def _norm_label_for_optionless(s: object) -> str:
+    if s is None:
+        return ""
+    if not isinstance(s, str):
+        s = str(s)
+    s = s.strip()
+    if not s:
+        return ""
+    s2 = re.sub(r"\s+", " ", s)
+    s2 = re.sub(r"\.\s*$", "", s2).strip()
+    # Common noise in OmniMed: "Benign image."
+    s2 = re.sub(r"\bimage\b\.?$", "", s2, flags=re.IGNORECASE).strip()
+    return s2
+
+
+def _extract_options_for_optionless(ans: dict[str, object]) -> list[str]:
+    opts: list[str] = []
+    for k in OPTION_KEYS:
+        v = ans.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if not s or s.lower() == "none":
+            continue
+        opts.append(s)
+    return opts
+
+
+def _is_binary_benign_malignant_options(options: list[str]) -> bool:
+    if len(options) != 2:
+        return False
+    norm = {_norm_label_for_optionless(o).lower() for o in options if _norm_label_for_optionless(o)}
+    norm = {re.sub(r"[^a-z]+", " ", x).strip() for x in norm}
+    return norm == {"benign", "malignant"}
+
+
+def _optionless_group_key(ans: dict[str, object]) -> str:
+    qtype = str(ans.get("question_type", "unknown")).strip() or "unknown"
+    opts = _extract_options_for_optionless(ans)
+    if _is_binary_benign_malignant_options(opts):
+        return f"{qtype}|binary_benign_malignant"
+    return f"{qtype}|option_count={len(opts)}"
+
+
+def build_optionless_prompt(*, question: str, candidate_labels: list[str]) -> str:
+    labels = [l.strip() for l in candidate_labels if isinstance(l, str) and l.strip()]
+    labels = sorted(dict.fromkeys(labels).keys())
+    lines = [
+        "You are a medical VQA assistant for dermoscopy images.",
+        "",
+        "Task: Predict the disease diagnosis label for the image.",
+        "",
+    ]
+    if question:
+        lines.extend([f"Question: {question}", ""])
+    lines.append("Candidate labels (choose exactly one; copy the label text):")
+    for l in labels:
+        lines.append(f"- {l}")
+    lines.extend(["", "Answer with ONLY the label text (no extra words).", "<answer></answer>"])
+    return "\n".join(lines)
+
+
+def transform_rows_to_optionless(rows: list[dict]) -> tuple[list[dict], dict]:
+    """
+    Rewrite only single-image MCQ rows to optionless text-label format.
+
+    Design goal: keep train-time transform behavior aligned with
+    `Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py`.
+    """
+    labels_by_group: dict[str, set[str]] = {}
+    for r in rows:
+        ans = r.get("answer") if isinstance(r.get("answer"), dict) else {}
+        task_type = str(ans.get("task_type", "")).strip()
+        if task_type != "mcq_letter":
+            continue
+
+        gk = _optionless_group_key(ans)
+        if gk.endswith("|binary_benign_malignant"):
+            labels_by_group.setdefault(gk, set()).update({"Benign", "Malignant"})
+        else:
+            lbl = ans.get("label")
+            if isinstance(lbl, str) and lbl.strip():
+                labels_by_group.setdefault(gk, set()).add(lbl.strip())
+
+    out_rows: list[dict] = []
+    rewritten = 0
+    skipped_invalid_prompt = 0
+    for r in rows:
+        prompt = r.get("prompt")
+        if not isinstance(prompt, str):
+            skipped_invalid_prompt += 1
+            out_rows.append(r)
+            continue
+
+        ans = r.get("answer") if isinstance(r.get("answer"), dict) else {}
+        task_type = str(ans.get("task_type", "")).strip()
+        if task_type != "mcq_letter":
+            out_rows.append(r)
+            continue
+
+        gk = _optionless_group_key(ans)
+        candidate = sorted(labels_by_group.get(gk, set()))
+        if gk.endswith("|binary_benign_malignant"):
+            candidate = ["Benign", "Malignant"]
+
+        question = _extract_question_from_prompt(prompt)
+        new_prompt = build_optionless_prompt(question=question, candidate_labels=candidate)
+
+        new_row = dict(r)
+        new_row["prompt"] = new_prompt
+
+        new_ans = dict(ans)
+        if isinstance(new_ans.get("label"), str) and new_ans["label"].strip():
+            correct_label = new_ans["label"].strip()
+            if gk.endswith("|binary_benign_malignant"):
+                correct_label = _norm_label_for_optionless(correct_label)
+                if correct_label.lower() in {"benign", "malignant"}:
+                    correct_label = correct_label.capitalize()
+            new_ans["correct_label"] = correct_label
+            new_ans["correct_answer_mcq"] = new_ans.get("correct_answer")
+            new_ans["correct_answer"] = new_ans["correct_label"]
+
+        new_ans["candidate_labels"] = candidate
+        new_ans["task_type"] = "mcq_optionless_text"
+        new_ans["optionless_group_key"] = gk
+        new_row["answer"] = new_ans
+
+        out_rows.append(new_row)
+        rewritten += 1
+
+    info = {
+        "rewritten_mcq": rewritten,
+        "skipped_invalid_prompt": skipped_invalid_prompt,
+        "num_groups": len(labels_by_group),
+        "labels_by_group": {k: sorted(v) for k, v in sorted(labels_by_group.items())},
+    }
+    return out_rows, info
 
 
 def build_base_rows(
@@ -1206,6 +1354,28 @@ def cmd_build_comparative(args: argparse.Namespace) -> None:
     print(json.dumps({"output": str(args.output), "generated": len(out_rows), "info": info}, ensure_ascii=False, indent=2))
 
 
+def cmd_build_optionless(args: argparse.Namespace) -> None:
+    rows = list(_read_jsonl(args.input))
+    out_rows, info = transform_rows_to_optionless(rows)
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    _write_jsonl(args.output, out_rows)
+
+    summary_path = args.summary
+    if summary_path is None:
+        summary_path = args.output.parent / f"{args.output.stem}.summary.json"
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary = {
+        "input": str(args.input),
+        "output": str(args.output),
+        "total_input_rows": len(rows),
+        "total_output_rows": len(out_rows),
+        "info": info,
+    }
+    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="OmniMedVQA benchmark builder + Comparative-RFT tasks (B1–B7)")
     p.add_argument("--omni_root", type=Path, default=_default_omni_root(), help="Path to OmniMedVQA root dir")
@@ -1251,6 +1421,15 @@ def build_argparser() -> argparse.ArgumentParser:
     p_comp.add_argument("--b7-nway", type=int, default=5, help="N-way for B7 support-set")
     p_comp.add_argument("--no-shuffle", action="store_true", help="Do not shuffle the final dataset")
     p_comp.set_defaults(func=cmd_build_comparative)
+
+    p_opt = sub.add_parser(
+        "build-optionless",
+        help="Rewrite single-image mcq_letter rows to optionless label-text rows (non-MCQ rows are passed through)",
+    )
+    p_opt.add_argument("--input", type=Path, required=True, help="Input JSONL path")
+    p_opt.add_argument("--output", type=Path, required=True, help="Output JSONL path")
+    p_opt.add_argument("--summary", type=Path, default=None, help="Optional summary JSON path")
+    p_opt.set_defaults(func=cmd_build_optionless)
 
     return p
 

@@ -35,9 +35,9 @@ VAL_FILE=${VAL_FILE:-"${DATA_DIR}/test_optionless.jsonl"}
 
 OMNI_ROOT=${OMNI_ROOT:-"${REPO_ROOT}/data/OmniMedVQA"}
 
-CONFIG=${CONFIG:-"${EASYR1_ROOT}/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml"}
+CONFIG=${CONFIG:-"${EASYR1_ROOT}/Comparative-R1/configs/omnimed_isic_gspo_singletask.yaml"}
 FORMAT_PROMPT=${FORMAT_PROMPT:-"${EASYR1_ROOT}/Comparative-R1/prompts/omnimed_isic.jinja"}
-REWARD_FUNCTION=${REWARD_FUNCTION:-"${EASYR1_ROOT}/Comparative-R1/reward/omnimed_isic_optionless_mixed_stepwise_reward_v1.py:compute_score"}
+REWARD_FUNCTION=${REWARD_FUNCTION:-"${EASYR1_ROOT}/Comparative-R1/reward/omnimed_isic_optionless_reward_v1.py:compute_score"}
 
 # ===== Training params =====
 NUM_GPUS=${NUM_GPUS:-4}
@@ -45,7 +45,7 @@ BATCH_SIZE=${BATCH_SIZE:-32}
 N_SAMPLES=${N_SAMPLES:-4}
 TEMPERATURE=${TEMPERATURE:-0.7}
 SAVE_FREQ=${SAVE_FREQ:-5}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_optionless_single_n${N_SAMPLES}_t${TEMPERATURE}"}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_optionless_try3_single_n${N_SAMPLES}_t${TEMPERATURE}"}
 
 # ===== Task-aware advantage (override config in this script) =====
 # Recommended: keep enabled for multi-task stability.

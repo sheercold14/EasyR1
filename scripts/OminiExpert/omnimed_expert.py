@@ -456,21 +456,25 @@ def _optionless_group_key(ans: dict[str, object]) -> str:
 
 
 def build_optionless_prompt(*, question: str, candidate_labels: list[str]) -> str:
+    del question  # keep signature stable; prompt text is now fixed by task type
     labels = [l.strip() for l in candidate_labels if isinstance(l, str) and l.strip()]
     labels = sorted(dict.fromkeys(labels).keys())
-    lines = [
-        "You are a medical VQA assistant for dermoscopy images.",
-        "",
-        "Task: Predict the disease diagnosis label for the image.",
-        "",
-    ]
-    if question:
-        lines.extend([f"Question: {question}", ""])
-    lines.append("Candidate labels (choose exactly one; copy the label text):")
-    for l in labels:
-        lines.append(f"- {l}")
-    lines.extend(["", "Answer with ONLY the label text (no extra words).", "<answer></answer>"])
-    return "\n".join(lines)
+
+    if _is_binary_benign_malignant_options(labels):
+        return (
+            "You are a medical VQA assistant for dermoscopy images. "
+            "Does the anomaly in this image indicate benign or malignant characteristics?<image>\n"
+            " Please choose one from list [Benign, Malignant]. "
+            "Answer with ONLY the label text.\n<answer></answer>"
+        )
+
+    label_list = ", ".join(labels)
+    return (
+        "You are a medical VQA assistant for dermoscopy images. "
+        "What is the specific skin condition depicted in this image? <image>\n"
+        f"Please choose one from list [{label_list}]. "
+        "Answer with ONLY the label text.\n<answer></answer>"
+    )
 
 
 def transform_rows_to_optionless(rows: list[dict]) -> tuple[list[dict], dict]:

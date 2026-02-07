@@ -64,7 +64,7 @@ _CANONICAL_LABEL_ALIASES: dict[str, list[str]] = {
         "lplk",
     ],
     "Actinic keratosis": ["actinic keratosis", "actinic keratoses", "ak", "akiec"],
-    "Squamous cell carcinoma": ["squamous cell carcinoma"],
+    "Squamous cell carcinoma": ["squamous cell carcinoma", "scc", "squamous carcinoma", "squamous cell ca"],
     "Vascular lesion": ["vascular lesion", "vascular lesions", "vasc"],
     "Dermatofibroma": ["dermatofibroma", "df"],
     "Benign": ["benign", "non cancerous", "noncancerous", "non malignant", "nonmalignant", "not malignant"],
@@ -177,7 +177,9 @@ def _canonicalize_label(text: str) -> str | None:
     norm = _normalize_label_text(text)
     if not norm:
         return None
-    return _ALIAS_TO_CANONICAL.get(norm, norm)
+    # Keep this strict: only exact alias/canonical form is accepted here.
+    # Richer phrase matching is handled by `_to_canonical_optionless_label`.
+    return _ALIAS_TO_CANONICAL.get(norm)
 
 
 def _extract_label_map(text: str, letters: list[str]) -> dict[str, str]:
@@ -217,15 +219,16 @@ def _score_step1_labels(response: str, gt_labels: list[str]) -> tuple[float, int
 
 
 def _to_canonical_optionless_label(text: str, *, candidate_labels: Optional[list[str]] = None) -> Optional[str]:
-    # Reuse the same canonicalization core as step1 aliases.
-    s = _canonicalize_label(text)
-    if s is not None:
-        return s
-
     norm = _normalize_label_text(text)
     if not norm:
         return None
 
+    # 1) exact alias/canonical match
+    s = _canonicalize_label(text)
+    if s is not None:
+        return s
+
+    # 2) prefer candidate label matching when candidates are provided
     if candidate_labels:
         cand = [c.strip() for c in candidate_labels if isinstance(c, str) and c.strip()]
         cand_norm = {_normalize_label_text(c): c for c in cand}
@@ -246,6 +249,16 @@ def _to_canonical_optionless_label(text: str, *, candidate_labels: Optional[list
             c = uniq[0]
             c_can = _canonicalize_label(c)
             return c_can if c_can is not None else c
+
+    # 3) fallback: unique synonym substring match from alias table
+    hay = f" {norm} "
+    matches: list[str] = []
+    for alias_norm, canon in _ALIAS_TO_CANONICAL.items():
+        if alias_norm and f" {alias_norm} " in hay:
+            matches.append(canon)
+    uniq = sorted(set(matches))
+    if len(uniq) == 1:
+        return uniq[0]
 
     return None
 

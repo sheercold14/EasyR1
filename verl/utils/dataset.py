@@ -183,6 +183,10 @@ class RLHFDataset(Dataset):
         if self.image_key in example:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
             images = example[self.image_key]
+            if isinstance(images, str):
+                images = [images]
+            elif images is None:
+                images = []
             if self.image_dir is not None and len(images) != 0 and isinstance(images[0], str):  # image paths
                 images = [os.path.join(self.image_dir, image) for image in images]
 
@@ -195,6 +199,10 @@ class RLHFDataset(Dataset):
         elif self.video_key in example:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
             videos = example[self.video_key]
+            if isinstance(videos, str):
+                videos = [videos]
+            elif videos is None:
+                videos = []
             if self.image_dir is not None and len(videos) != 0 and isinstance(videos[0], str):  # video paths
                 videos = [os.path.join(self.image_dir, video) for video in videos]
 
@@ -221,6 +229,10 @@ class RLHFDataset(Dataset):
         if self.image_key in example:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
             images = example.pop(self.image_key)
+            if isinstance(images, str):
+                images = [images]
+            elif images is None:
+                images = []
             if self.image_dir is not None and len(images) != 0 and isinstance(images[0], str):  # image paths
                 images = [os.path.join(self.image_dir, image) for image in images]
 
@@ -235,6 +247,10 @@ class RLHFDataset(Dataset):
         elif self.video_key in example:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
             videos = example.pop(self.video_key)
+            if isinstance(videos, str):
+                videos = [videos]
+            elif videos is None:
+                videos = []
             if self.image_dir is not None and len(videos) != 0 and isinstance(videos[0], str):  # video paths
                 videos = [os.path.join(self.image_dir, video) for video in videos]
 

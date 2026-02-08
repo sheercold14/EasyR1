@@ -11,18 +11,18 @@ What it does:
 5) Dumps generations and per-sample records like `eval_checkpoint_and_dump.py`.
 
 Usage:
-  python3 EasyR1/Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
-    --config EasyR1/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml \
-    --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/comparative_r1/omnimed_isic_v1_b1_800_n4_t0.7/global_step_235 \
-    --val /mnt/cache/wuruixiao/users/lsc/EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test.jsonl \
-    --out EasyR1/checkpoints/eval_runs/isic_b1800_optionless_val \
-    --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
+  python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
+    --config Comparative-R1/configs/dtd_config.yaml \
+    --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/CLS-RL/comparative_r1/qwen2_5_7b_dtd_b2n_gspo_thinking/global_step_155 \
+    --val ./data/CLS/DTD/B-tasks/DescribableTextures_b2n_B700.jsonl \
+    --out ./checkpoints/Eval-CLS/dtd_b700_thinking_fewshot4_eval \
+    --override [worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b,trainer.reward_function=Comparative-R1/reward/dtd_direct_mixed_reward.py:compute_score]
     
 python3 EasyR1/Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
     --config EasyR1/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml \
     --val /mnt/cache/wuruixiao/users/lsc/EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test_optionless.jsonl \
     --out EasyR1/checkpoints/eval_runs/isic_pretrain_optionless_test_v2 \
-    --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
+    --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b 
 
 Notes:
 - This is meant for *single-image* disease diagnosis style tasks (task_type=mcq_letter).

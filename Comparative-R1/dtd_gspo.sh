@@ -11,10 +11,12 @@ FORMAT_PROMPT=/mnt/cache/wuruixiao/users/lsc/EasyR1/Comparative-R1/prompts/dtd_n
 REWARD_FUNCTION=/mnt/cache/wuruixiao/users/lsc/EasyR1/Comparative-R1/reward/dtd_noformat.py
 # EXPERIMENT_NAME="qwen2_5_7b_dtd_b2n_gspo_thinking"
 EXPERIMENT_NAME="qwen2_5_7b_isic_gspo"
+IMAGE_DIR=/mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA
 # Optional: resume from an existing checkpoint (leave empty to train from MODEL_PATH).
 # LOAD_CHECKPOINT_PATH=
 
 python3 -m verl.trainer.main \
+    data.image_dir=${IMAGE_DIR} \
     config=Comparative-R1/configs/dtd_config.yaml \
     worker.actor.model.model_path=${MODEL_PATH} \
     trainer.experiment_name=${EXPERIMENT_NAME}\

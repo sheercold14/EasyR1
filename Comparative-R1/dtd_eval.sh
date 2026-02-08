@@ -3,11 +3,14 @@
 set -x
 
 MODEL_PATH=${MODEL_PATH:-/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b}
-CHECKPOINT_PATH=${CHECKPOINT_PATH:-}
+CHECKPOINT_PATH=${CHECKPOINT_PATH:-/mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/CLS-RL/comparative_r1/qwen2_5_7b_dtd_b2n_gspo_thinking/global_step_155}
 CONFIG_PATH=${CONFIG_PATH:-Comparative-R1/configs/dtd_config.yaml}
-EVAL_FILE=${EVAL_FILE:-}
+EVAL_FILE=${EVAL_FILE:-/mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/DTD/B-tasks/DescribableTextures_b2n_B700.jsonl}
+IMAGE_DIR=/mnt/cache/wuruixiao/users/lsc/data/dtd/images/
+
+
 MODE=${MODE:-multi}  # single | multi
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-dtd_eval_${MODE}}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-dtd_eval_${MODE}_thinking}
 N_GPUS=${N_GPUS:-4}
 
 # single/multi unified reward:
@@ -50,15 +53,20 @@ if [ -n "${CHECKPOINT_PATH}" ]; then
 fi
 
 python3 -m verl.trainer.main \
+    trainer.val_generations_to_log=100000 \
+    data.image_dir=${IMAGE_DIR} \
     config=${CONFIG_PATH} \
     worker.actor.model.model_path=${MODEL_PATH} \
+    trainer.project_name="Eval-CLS" \
     trainer.experiment_name=${EXPERIMENT_NAME} \
     trainer.n_gpus_per_node=${N_GPUS} \
     trainer.val_only=true \
     trainer.val_before_train=true \
     trainer.find_last_checkpoint=false \
     trainer.logger='[file]' \
+    data.shuffle=false \
     worker.reward.reward_function=${REWARD_FUNCTION} \
+    data.train_files=${EVAL_FILE} \
     data.val_files=${EVAL_FILE} \
     data.prompt_key=${PROMPT_KEY} \
     data.answer_key=${ANSWER_KEY} \

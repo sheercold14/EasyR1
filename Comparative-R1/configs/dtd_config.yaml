@@ -1,7 +1,7 @@
 data:
-  train_files: /data/shichao/datasets_b2n/DescribableTextures_b2n_4.jsonl
+  train_files: /mnt/cache/wuruixiao/users/lsc/data/datasets_b2n/DescribableTextures_b2n_4.jsonl
   # Default validation set is base test; override to new test for base-to-new reporting.
-  val_files: /data/shichao/datasets_b2n/DescribableTextures_b2n_base_test.jsonl
+  val_files: /mnt/cache/wuruixiao/users/lsc/data/datasets_b2n/DescribableTextures_b2n_base_test.jsonl
   prompt_key: problem
   answer_key: label
   image_key: image
@@ -9,23 +9,23 @@ data:
   # DTD images are typically under `${DTD_ROOT}/images/<class>/<img>.jpg`.
   image_dir: /mnt/cache/wuruixiao/users/lsc/data/dtd/images
   video_fps: 2.0
-  max_prompt_length: 2048
-  max_response_length: 2048
+  max_prompt_length: 15000
+  max_response_length: 1024
   rollout_batch_size: 32  # equivalent to verl's data.train_batch_size
   mini_rollout_batch_size: null  # equivalent to verl's data.gen_batch_size
-  val_batch_size: 2
+  val_batch_size: 16
   format_prompt: ./Comparative-R1/prompts/dtd.jinja
   override_chat_template: null
   shuffle: true
-  seed: 1
+  seed: 42
   min_pixels: 262144
   max_pixels: 4194304
   filter_overlong_prompts: true
 
 algorithm:
   adv_estimator: grpo
-  disable_kl: false
-  use_kl_loss: true
+  disable_kl: true
+  use_kl_loss: false
   kl_penalty: low_var_kl
   kl_coef: 1.0e-2
   online_filtering: false  # dapo filter groups
@@ -40,8 +40,8 @@ worker:
     clip_ratio_low: 3e-4
     clip_ratio_high: 4e-4
     global_batch_size: 32 # equivalent to verl's actor.ppo_mini_batch_size
-    micro_batch_size_per_device_for_update: 2  # equivalent to verl's actor.ppo_micro_batch_size_per_gpu
-    micro_batch_size_per_device_for_experience: 4  # equivalent to verl's rollout.log_prob_micro_batch_size_per_gpu
+    micro_batch_size_per_device_for_update: 1  # equivalent to verl's actor.ppo_micro_batch_size_per_gpu
+    micro_batch_size_per_device_for_experience: 2  # equivalent to verl's rollout.log_prob_micro_batch_size_per_gpu
     max_grad_norm: 1.0
     padding_free: true
     dynamic_batching: true
@@ -49,7 +49,7 @@ worker:
     model:
       model_path: Qwen/Qwen2.5-7B-Instruct
       enable_gradient_checkpointing: true
-      trust_remote_code: false
+      trust_remote_code: true
       freeze_vision_tower: false
     optim:
       lr: 1.0e-6
@@ -65,11 +65,11 @@ worker:
       offload_optimizer: true  # true: more CPU memory; false: more GPU memory
 
   rollout:
-    n: 8
+    n: 4
     temperature: 0.7
     top_p: 0.9
-    limit_images: 0
-    gpu_memory_utilization: 0.8
+    limit_images: 6
+    gpu_memory_utilization: 0.7
     enforce_eager: false
     enable_chunked_prefill: false
     tensor_parallel_size: 1
@@ -78,6 +78,7 @@ worker:
       temperature: 0.6
       top_p: 0.95
       n: 1
+    max_num_batched_tokens: 18000
 
   ref:
     fsdp:
@@ -93,8 +94,8 @@ worker:
 trainer:
   total_epochs: 200
   max_steps: null
-  project_name: easy_r1
-  experiment_name: qwen2_5_7b_dtd_b2n_gspo
+  project_name: CLS-RL
+  experiment_name: qwen2_5_7b_dtd_b2n_gspo_nothinking
   logger: ["file", "swanlab"]
   nnodes: 1
   n_gpus_per_node: 4
@@ -104,7 +105,7 @@ trainer:
   val_only: false
   val_generations_to_log: 6
   save_freq: 5  # -1 to disable
-  save_limit: 3  # -1 to disable
+  save_limit: 1  # -1 to disable
   save_model_only: false
   save_checkpoint_path: null
   load_checkpoint_path: null

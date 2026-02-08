@@ -22,8 +22,8 @@ Example (mcq single-image file, keep all):
 
 python3 EasyR1/scripts/OminiExpert/eval_checkpoint_and_dump.py \
   --config EasyR1/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml \
-  --val EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test.jsonl \
-  --out EasyR1/checkpoints/eval_runs/isic_pretrain_test \
+  --val EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test_optionless.jsonl \
+  --out EasyR1/checkpoints/eval_runs/isic_pretrain_test_TQA \
   --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
 
   python EasyR1/scripts/OminiExpert/eval_checkpoint_and_dump.py \

@@ -15,16 +15,7 @@ set -euo pipefail
 EASYR1_ROOT="/mnt/cache/wuruixiao/users/lsc/EasyR1"
 REPO_ROOT="/mnt/cache/wuruixiao/users/lsc"
 
-pick_existing_dir() {
-  for d in "$@"; do
-    if [[ -n "${d}" && -d "${d}" ]]; then
-      echo "${d}"
-      return 0
-    fi
-  done
-  echo ""
-  return 0
-}
+
 
 # ===== Paths =====
 MODEL_PATH=${MODEL_PATH:-"/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b"}
@@ -45,11 +36,11 @@ BATCH_SIZE=${BATCH_SIZE:-32}
 N_SAMPLES=${N_SAMPLES:-4}
 TEMPERATURE=${TEMPERATURE:-0.7}
 SAVE_FREQ=${SAVE_FREQ:-5}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_optionless_try3_single_n${N_SAMPLES}_t${TEMPERATURE}"}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-"omnimed_isic_optionless_try4_single_n${N_SAMPLES}_t${TEMPERATURE}"}
 
 # ===== Task-aware advantage (override config in this script) =====
 # Recommended: keep enabled for multi-task stability.
-TASK_AWARE_ENABLE=${TASK_AWARE_ENABLE:-true}
+TASK_AWARE_ENABLE=${TASK_AWARE_ENABLE:-false}
 TASK_WEIGHT_SINGLE=${TASK_WEIGHT_SINGLE:-1.0}
 TASK_WEIGHT_B1=${TASK_WEIGHT_B1:-1.0}
 TASK_WEIGHT_B2=${TASK_WEIGHT_B2:-1.0}

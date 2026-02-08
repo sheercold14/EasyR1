@@ -500,6 +500,126 @@ def _norm_label_for_optionless(s: object) -> str:
     return s2
 
 
+def _normalize_label_value(val: object, *, normalize: bool) -> str:
+    if val is None:
+        return ""
+    if normalize:
+        return _norm_label_for_optionless(val)
+    return _norm_text(val)
+
+
+def _normalize_rows_labels(rows: list[dict]) -> tuple[list[dict], dict]:
+    """
+    Normalize answer labels in rows and drop rows that become empty.
+    """
+    out: list[dict] = []
+    dropped = 0
+    changed = 0
+    for r in rows:
+        ans = r.get("answer") if isinstance(r.get("answer"), dict) else {}
+        raw_label = ans.get("label")
+        new_label = _norm_label_for_optionless(raw_label)
+        if not new_label:
+            dropped += 1
+            continue
+        if isinstance(raw_label, str) and raw_label.strip() != new_label:
+            changed += 1
+        new_ans = dict(ans)
+        new_ans["label"] = new_label
+        new_row = dict(r)
+        new_row["answer"] = new_ans
+        out.append(new_row)
+    info = {
+        "normalized": True,
+        "rows_in": len(rows),
+        "rows_out": len(out),
+        "labels_changed": changed,
+        "rows_dropped": dropped,
+    }
+    return out, info
+
+
+def build_fewshot_problem(question: str, candidate_labels: list[str], *, default_question: str) -> str:
+    q = question.strip() if isinstance(question, str) else ""
+    if not q:
+        q = default_question
+    labels = [l.strip() for l in candidate_labels if isinstance(l, str) and l.strip()]
+    return f"{q}\nPlease choose one from list [ {', '.join(labels)}]."
+
+
+def _sample_candidate_labels(
+    rng: random.Random, *, label_pool: list[str], correct_label: str, k: int
+) -> list[str]:
+    if not correct_label:
+        return []
+    pool = list(label_pool)
+    if correct_label not in pool:
+        pool.append(correct_label)
+    if k <= 0:
+        return [correct_label]
+    k = min(k, len(pool))
+    if k == 1:
+        return [correct_label]
+    distractors = [l for l in pool if l != correct_label]
+    if len(distractors) >= (k - 1):
+        distractors = rng.sample(distractors, k - 1)
+    candidates = [correct_label, *distractors]
+    rng.shuffle(candidates)
+    return candidates
+
+
+def _build_fewshot_dtd_rows(
+    rows: list[dict],
+    *,
+    split: str,
+    rng: random.Random,
+    label_pool: list[str],
+    label_pool_size: int,
+    default_question: str,
+    normalize_labels: bool,
+) -> tuple[list[dict], dict]:
+    out: list[dict] = []
+    skipped = 0
+    for r in rows:
+        imgs = r.get("images") or []
+        if not isinstance(imgs, list) or not imgs or not isinstance(imgs[0], str):
+            skipped += 1
+            continue
+        ans = r.get("answer") if isinstance(r.get("answer"), dict) else {}
+        label = _normalize_label_value(ans.get("label", ""), normalize=normalize_labels)
+        if not label:
+            skipped += 1
+            continue
+        prompt = r.get("prompt")
+        question = _extract_question_from_prompt(prompt) if isinstance(prompt, str) else ""
+        candidates = _sample_candidate_labels(
+            rng,
+            label_pool=label_pool,
+            correct_label=label,
+            k=label_pool_size,
+        )
+        problem = build_fewshot_problem(
+            question,
+            candidates,
+            default_question=default_question,
+        )
+        out.append(
+            {
+                "image": imgs[0],
+                "label": label,
+                "split": split,
+                "problem": problem,
+            }
+        )
+    info = {
+        "split": split,
+        "rows_in": len(rows),
+        "rows_out": len(out),
+        "rows_skipped": skipped,
+    }
+    return out, info
+
+
 def _extract_options_for_optionless(ans: dict[str, object]) -> list[str]:
     opts: list[str] = []
     for k in OPTION_KEYS:
@@ -1546,6 +1666,136 @@ def cmd_build_base(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
+def cmd_build_fewshot_dtd(args: argparse.Namespace) -> None:
+    if args.shots <= 0:
+        raise SystemExit("--shots must be > 0")
+    if args.label_pool_size <= 0:
+        raise SystemExit("--label-pool-size must be > 0")
+
+    ds_map = discover_omnimedvqa_datasets(args.omni_root)
+    if args.dataset_regex:
+        pat = re.compile(args.dataset_regex)
+        datasets = [name for name in sorted(ds_map.keys()) if pat.search(name)]
+    else:
+        datasets = args.datasets
+
+    if not datasets:
+        raise SystemExit("No datasets selected. Provide --datasets ... or --dataset-regex ...")
+
+    missing = [d for d in datasets if d not in ds_map]
+    if missing:
+        raise SystemExit(f"Unknown datasets: {missing}. Use 'list' to see available names.")
+
+    raw_items: list[dict] = []
+    for d in datasets:
+        raw_items.extend(_read_json(ds_map[d]))
+
+    allowed_qtypes = set(args.question_type) if args.question_type else None
+    allowed_ds = set(datasets)
+    allowed_mod = set(args.modality_type) if args.modality_type else None
+
+    rows, build_info = build_base_rows(
+        raw_items,
+        omni_root=args.omni_root,
+        allowed_question_types=allowed_qtypes,
+        allowed_datasets=allowed_ds,
+        allowed_modality_types=allowed_mod,
+        min_option_count=args.min_option_count,
+        max_option_count=args.max_option_count,
+        skip_missing_images=args.skip_missing_images,
+    )
+
+    norm_info = {"normalized": False, "rows_in": len(rows), "rows_out": len(rows)}
+    if args.normalize_labels:
+        rows, norm_info = _normalize_rows_labels(rows)
+
+    train_rows, test_rows, split_info = fewshot_kshot_with_rest_as_test(
+        rows, shots=args.shots, seed=args.seed
+    )
+
+    label_pool_set: set[str] = set()
+    for r in rows:
+        if not isinstance(r.get("answer"), dict):
+            continue
+        raw_label = r.get("answer", {}).get("label", "")
+        lbl = _normalize_label_value(raw_label, normalize=args.normalize_labels)
+        if lbl:
+            label_pool_set.add(lbl)
+    label_pool = sorted(label_pool_set)
+    if not label_pool:
+        raise SystemExit("No labels found after filtering.")
+
+    label_pool_size = min(args.label_pool_size, len(label_pool))
+    rng = random.Random(args.seed)
+
+    train_out, train_info = _build_fewshot_dtd_rows(
+        train_rows,
+        split="train",
+        rng=rng,
+        label_pool=label_pool,
+        label_pool_size=label_pool_size,
+        default_question=args.default_question,
+        normalize_labels=args.normalize_labels,
+    )
+    test_out, test_info = _build_fewshot_dtd_rows(
+        test_rows,
+        split="test",
+        rng=rng,
+        label_pool=label_pool,
+        label_pool_size=label_pool_size,
+        default_question=args.default_question,
+        normalize_labels=args.normalize_labels,
+    )
+
+    out_dir: Path = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    def _slugify(name: str) -> str:
+        s = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")
+        return s or "omnimedvqa"
+
+    if args.out_stem:
+        stem = _slugify(args.out_stem)
+    elif len(datasets) == 1:
+        stem = _slugify(datasets[0])
+    elif args.dataset_regex:
+        stem = _slugify(args.dataset_regex)
+    else:
+        stem = "omnimedvqa"
+
+    train_path = out_dir / f"{stem}_fewshot_{args.shots}.jsonl"
+    test_path = out_dir / f"{stem}_fewshot_test.jsonl"
+    _write_jsonl(train_path, train_out)
+    _write_jsonl(test_path, test_out)
+
+    summary = {
+        "datasets": datasets,
+        "filters": {
+            "question_type": args.question_type,
+            "modality_type": args.modality_type,
+            "min_option_count": args.min_option_count,
+            "max_option_count": args.max_option_count,
+        },
+        "build": build_info,
+        "label_normalization": norm_info,
+        "fewshot_split": split_info,
+        "export": {
+            "shots": args.shots,
+            "label_pool_size_requested": args.label_pool_size,
+            "label_pool_size_effective": label_pool_size,
+            "label_pool_total": len(label_pool),
+            "default_question": args.default_question,
+            "train_output": str(train_path),
+            "test_output": str(test_path),
+            "train_info": train_info,
+            "test_info": test_info,
+        },
+    }
+    summary_path = out_dir / f"{stem}_fewshot_{args.shots}.summary.json"
+    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
 def cmd_build_comparative(args: argparse.Namespace) -> None:
     rows = list(_read_jsonl(args.input))
     task_counts = _parse_task_specs(args.task)
@@ -1797,6 +2047,35 @@ def build_argparser() -> argparse.ArgumentParser:
     )
     p_base.add_argument("--out-dir", type=Path, required=True, help="Output directory (writes train/val/test.jsonl)")
     p_base.set_defaults(func=cmd_build_base)
+
+    p_few = sub.add_parser(
+        "build-fewshot-dtd",
+        help="Export K-shot train + rest-as-test in DTD-style JSONL (image/label/split/problem)",
+    )
+    p_few.add_argument("--datasets", nargs="*", default=[], help="Dataset names (match QA_information/*.json stem)")
+    p_few.add_argument("--dataset-regex", dest="dataset_regex", default=None, help="Regex to select datasets by name")
+    p_few.add_argument("--question-type", action="append", default=[], help="Filter by question_type (repeatable)")
+    p_few.add_argument("--modality-type", action="append", default=[], help="Filter by modality_type (repeatable)")
+    p_few.add_argument("--min-option-count", type=int, default=None, help="Filter by minimum non-empty option count")
+    p_few.add_argument("--max-option-count", type=int, default=None, help="Filter by maximum non-empty option count")
+    p_few.add_argument("--shots", type=int, required=True, help="K-shot per label for train split")
+    p_few.add_argument("--label-pool-size", type=int, default=30, help="Number of labels to include in prompt list")
+    p_few.add_argument("--seed", type=int, default=42)
+    p_few.add_argument("--skip-missing-images", action="store_true", help="Skip rows whose image file is missing")
+    p_few.add_argument(
+        "--normalize-labels",
+        action="store_true",
+        help="Normalize labels (strip trailing '.', remove 'image') before few-shot sampling",
+    )
+    p_few.add_argument(
+        "--default-question",
+        type=str,
+        default="What is the diagnosis shown in the image?",
+        help="Fallback question when prompt parsing fails",
+    )
+    p_few.add_argument("--out-dir", type=Path, required=True, help="Output directory for few-shot JSONL files")
+    p_few.add_argument("--out-stem", type=str, default=None, help="Output filename stem (default: dataset name/regex)")
+    p_few.set_defaults(func=cmd_build_fewshot_dtd)
 
     p_comp = sub.add_parser("build-comparative", help="Generate comparative tasks (B1–B7) from a base train.jsonl")
     p_comp.add_argument("--input", type=Path, required=True, help="Input JSONL (usually train.jsonl)")

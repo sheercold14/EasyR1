@@ -11,10 +11,25 @@ This script supports:
   6) Rewriting single-image MCQ rows to optionless label-text rows
   7) Expanding train data into multi-image comparative tasks (B1–B7)
   8) One-shot mixed-train build via config (optionless + B tasks + ratio/shuffle/summary)
+  9) Export DTD-style few-shot JSONL (image/label/split/problem) for OmniMedVQA
 
 Default paths assume this repo layout:
   <repo_root>/data/OmniMedVQA
   <repo_root>/data/OminiMedExpert
+
+Usage (few-shot DTD export, matches data/datasets_fewshot/*.jsonl format):
+  python3 Comparative-R1/scripts/ominimed_expertv2.py \\
+    --omni_root /path/to/OmniMedVQA \\
+    build-fewshot-dtd \\
+    --dataset-regex "ISIC" \\
+    --question-type "Disease Diagnosis" \\
+    --min-option-count 2 \\
+    --max-option-count 4 \\
+    --shots 4 \\
+    --seed 42 \\
+    --label-pool-size 30 \\
+    --skip-missing-images \\
+    --out-dir /path/to/output_dir
 """
 
 from __future__ import annotations

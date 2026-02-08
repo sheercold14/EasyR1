@@ -433,6 +433,51 @@ def fewshot_kshot_by_label(rows: list[dict], *, shots: int, seed: int) -> list[d
     return out
 
 
+def fewshot_kshot_with_rest_as_test(
+    rows: list[dict], *, shots: int, seed: int
+) -> tuple[list[dict], list[dict], dict[str, object]]:
+    if shots <= 0:
+        raise ValueError("shots must be > 0")
+
+    rng = random.Random(seed)
+    by_label: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        a = r.get("answer") or {}
+        if not isinstance(a, dict):
+            continue
+        lbl = _norm_text(a.get("label", ""))
+        if not lbl:
+            continue
+        by_label[lbl].append(r)
+
+    train: list[dict] = []
+    test: list[dict] = []
+    missing: list[str] = []
+    for lbl in sorted(by_label.keys()):
+        pool = list(by_label[lbl])
+        if len(pool) < shots:
+            missing.append(f"{lbl} ({len(pool)}/{shots})")
+            continue
+        rng.shuffle(pool)
+        train.extend(pool[:shots])
+        test.extend(pool[shots:])
+
+    if missing:
+        raise ValueError("Not enough samples for k-shot labels: " + ", ".join(missing))
+
+    rng.shuffle(train)
+    rng.shuffle(test)
+    info: dict[str, object] = {
+        "mode": "fewshot_train_rest_test",
+        "shots": shots,
+        "seed": seed,
+        "train_rows": len(train),
+        "test_rows": len(test),
+        "labels": len(by_label),
+    }
+    return train, test, info
+
+
 def _extract_question_from_prompt(prompt: str) -> str:
     m = _OPTIONLESS_QUESTION_RE.search(prompt)
     if not m:
@@ -1402,6 +1447,8 @@ def cmd_inspect(args: argparse.Namespace) -> None:
 def cmd_build_base(args: argparse.Namespace) -> None:
     if args.fewshot_shots is not None and args.fewshot_shots <= 0:
         raise SystemExit("--fewshot-shots must be > 0")
+    if args.fewshot_as_train_rest_as_test and args.fewshot_shots is None:
+        raise SystemExit("--fewshot-as-train-rest-as-test requires --fewshot-shots")
 
     ds_map = discover_omnimedvqa_datasets(args.omni_root)
     if args.dataset_regex:
@@ -1436,13 +1483,17 @@ def cmd_build_base(args: argparse.Namespace) -> None:
         skip_missing_images=args.skip_missing_images,
     )
 
-    ratios = _parse_ratio3(args.split)
-    train, val, test, split_info = split_by_group(
-        rows,
-        seed=args.seed,
-        ratios=ratios,
-        group_id_fn=default_group_id,
-    )
+    if args.fewshot_as_train_rest_as_test:
+        train, test, split_info = fewshot_kshot_with_rest_as_test(rows, shots=args.fewshot_shots, seed=args.seed)
+        val: list[dict] = []
+    else:
+        ratios = _parse_ratio3(args.split)
+        train, val, test, split_info = split_by_group(
+            rows,
+            seed=args.seed,
+            ratios=ratios,
+            group_id_fn=default_group_id,
+        )
 
     out_dir: Path = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1455,7 +1506,7 @@ def cmd_build_base(args: argparse.Namespace) -> None:
     if args.fewshot_ratio is not None:
         fewshot_rows = fewshot_balanced_by_label(train, ratio=args.fewshot_ratio, seed=args.seed)
         _write_jsonl(out_dir / f"train_fewshot_{args.fewshot_ratio}.jsonl", fewshot_rows)
-    if args.fewshot_shots is not None:
+    if args.fewshot_shots is not None and not args.fewshot_as_train_rest_as_test:
         kshot_rows = fewshot_kshot_by_label(train, shots=args.fewshot_shots, seed=args.seed)
         _write_jsonl(out_dir / f"train_fewshot_{args.fewshot_shots}shot.jsonl", kshot_rows)
 
@@ -1478,10 +1529,17 @@ def cmd_build_base(args: argparse.Namespace) -> None:
             "ratio": args.fewshot_ratio,
             "train_fewshot": _summarize_rows(fewshot_rows),
         }
-    if args.fewshot_shots is not None:
+    if args.fewshot_shots is not None and not args.fewshot_as_train_rest_as_test:
         summary["fewshot_kshot"] = {
             "shots": args.fewshot_shots,
             "train_fewshot": _summarize_rows(kshot_rows),
+        }
+    if args.fewshot_as_train_rest_as_test:
+        summary["fewshot_kshot"] = {
+            "shots": args.fewshot_shots,
+            "mode": "train_is_kshot_per_label_test_is_rest",
+            "train_fewshot": _summarize_rows(train),
+            "test_rest": _summarize_rows(test),
         }
 
     (out_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1732,6 +1790,11 @@ def build_argparser() -> argparse.ArgumentParser:
     p_base.add_argument("--skip-missing-images", action="store_true", help="Skip rows whose image file is missing")
     p_base.add_argument("--fewshot-ratio", type=float, default=None, help="If set, write balanced fewshot train subset")
     p_base.add_argument("--fewshot-shots", type=int, default=None, help="If set, write balanced k-shot per-label train subset")
+    p_base.add_argument(
+        "--fewshot-as-train-rest-as-test",
+        action="store_true",
+        help="Use k-shot per label as train and put the remaining samples into test (val will be empty)",
+    )
     p_base.add_argument("--out-dir", type=Path, required=True, help="Output directory (writes train/val/test.jsonl)")
     p_base.set_defaults(func=cmd_build_base)
 

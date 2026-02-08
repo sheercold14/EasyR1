@@ -21,11 +21,12 @@ The original `scripts/OminiExpert/omnimed_expert.py` is not modified by this scr
 ```bash
 python3 Comparative-R1/scripts/ominimed_expertv2.py build-base \
   --omni_root /path/to/OmniMedVQA \
-  --dataset-regex "ISIC" \
+  --dataset-regex ISIC2018 ISIC2019 ISIC2020 \
   --question-type "Disease Diagnosis" \
-  --split 0.8,0.1,0.1 \
   --seed 42 \
+  --fewshot-as-train-rest-as-test \
   --fewshot-shots 4 \
+  --prompt-style dtd \
   --out-dir /path/to/output_dir
 ```
 

@@ -992,6 +992,7 @@ LabelSpaceBy = Literal[
     "question_type+optioncount",
     "question_type+modality+optioncount",
 ]
+PromptStyle = Literal["stepwise", "direct"]
 
 
 def _option_count(options: dict[str, str | None]) -> int:
@@ -1059,7 +1060,9 @@ def _sample_distinct(rng: random.Random, items: list[VqaItem], k: int) -> list[V
     return [rng.choice(items) for _ in range(k)]
 
 
-def gen_b1_target_search(rng: random.Random, *, by_label: dict[str, list[VqaItem]], k: int) -> dict:
+def gen_b1_target_search(
+    rng: random.Random, *, by_label: dict[str, list[VqaItem]], k: int, prompt_style: PromptStyle = "stepwise"
+) -> dict:
     labels = sorted(by_label.keys())
     if len(labels) < 2:
         raise ValueError("Need at least 2 labels for B1")
@@ -1082,15 +1085,23 @@ def gen_b1_target_search(rng: random.Random, *, by_label: dict[str, list[VqaItem
     correct_idx = next(i for i, it in enumerate(chosen) if it.image == target_item.image)
     correct = letters[correct_idx]
 
-    prompt = (
-        "You are a medical VQA assistant.\n\n"
-        f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
-        f"{_render_images(letters)}\n\n"
-        f"Task (B1 Target-search): Exactly one image shows **{target_label}**. Which image is it?\n\n"
-        "First, identify the condition shown in each image.\n"
-        f"Final must be one letter: {_letter_options(letters)}.\n"
-        + _render_stepwise_answer_format(letters, "{one letter}")
-    )
+    if prompt_style == "direct":
+        prompt = (
+            f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
+            f"{_render_images(letters)}\n\n"
+            f"Task (B1 Target-search): Exactly one image shows **{target_label}**. Which image is it?\n\n"
+            f"Answer with only one letter: {_letter_options(letters)}.\n"
+            f"<answer>{_letter_options(letters)}</answer>"
+        )
+    else:
+        prompt = (
+            f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
+            f"{_render_images(letters)}\n\n"
+            f"Task (B1 Target-search): Exactly one image shows **{target_label}**. Which image is it?\n\n"
+            "First, identify the condition shown in each image.\n"
+            f"Final must be one letter: {_letter_options(letters)}.\n"
+            + _render_stepwise_answer_format(letters, "{one letter}")
+        )
 
     return {
         "prompt": prompt,
@@ -1107,7 +1118,9 @@ def gen_b1_target_search(rng: random.Random, *, by_label: dict[str, list[VqaItem
     }
 
 
-def gen_b2_odd_one_out(rng: random.Random, *, by_label: dict[str, list[VqaItem]], k: int) -> dict:
+def gen_b2_odd_one_out(
+    rng: random.Random, *, by_label: dict[str, list[VqaItem]], k: int, prompt_style: PromptStyle = "stepwise"
+) -> dict:
     labels = sorted(by_label.keys())
     if len(labels) < 2:
         raise ValueError("Need at least 2 labels for B2")
@@ -1124,16 +1137,25 @@ def gen_b2_odd_one_out(rng: random.Random, *, by_label: dict[str, list[VqaItem]]
     correct_idx = next(i for i, it in enumerate(chosen) if it.image == odd_item.image)
     correct = letters[correct_idx]
 
-    prompt = (
-        "You are a medical VQA assistant.\n\n"
-        f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
-        f"{_render_images(letters)}\n\n"
-        f"Task (B2 Odd-one-out): Exactly {k-1} images depict the same condition and 1 image depicts a different condition.\n"
-        "Which image is the odd one out?\n\n"
-        "First, identify the condition shown in each image.\n"
-        f"Final must be one letter: {_letter_options(letters)}.\n"
-        + _render_stepwise_answer_format(letters, "{one letter}")
-    )
+    if prompt_style == "direct":
+        prompt = (
+            f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
+            f"{_render_images(letters)}\n\n"
+            f"Task (B2 Odd-one-out): Exactly {k-1} images depict the same condition and 1 image depicts a different condition.\n"
+            "Which image is the odd one out?\n\n"
+            f"Answer with only one letter: {_letter_options(letters)}.\n"
+            f"<answer>{_letter_options(letters)}</answer>"
+        )
+    else:
+        prompt = (
+            f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
+            f"{_render_images(letters)}\n\n"
+            f"Task (B2 Odd-one-out): Exactly {k-1} images depict the same condition and 1 image depicts a different condition.\n"
+            "Which image is the odd one out?\n\n"
+            "First, identify the condition shown in each image.\n"
+            f"Final must be one letter: {_letter_options(letters)}.\n"
+            + _render_stepwise_answer_format(letters, "{one letter}")
+        )
 
     return {
         "prompt": prompt,
@@ -1151,7 +1173,9 @@ def gen_b2_odd_one_out(rng: random.Random, *, by_label: dict[str, list[VqaItem]]
     }
 
 
-def gen_b3_label_corruption(rng: random.Random, *, by_label: dict[str, list[VqaItem]], k: int) -> dict:
+def gen_b3_label_corruption(
+    rng: random.Random, *, by_label: dict[str, list[VqaItem]], k: int, prompt_style: PromptStyle = "stepwise"
+) -> dict:
     labels = sorted(by_label.keys())
     if k < 2:
         raise ValueError("k must be >= 2 for B3")
@@ -1178,15 +1202,24 @@ def gen_b3_label_corruption(rng: random.Random, *, by_label: dict[str, list[VqaI
     letters = _letters(k)
     correct = letters[corrupt_idx]
 
-    prompt = (
-        "You are a medical VQA assistant.\n\n"
-        "Below are image-label pairs. Exactly one claimed label is incorrect.\n"
-        "Identify which position has the corrupted (wrong) label.\n\n"
-        f"Pairs are labeled {_letter_options(letters)}.\n\n"
-        f"{_render_labeled_images(letters, shown_labels)}\n\n"
-        "Answer with only one letter.\n"
-        f"<answer> {_letter_options(letters)} </answer>"
-    )
+    if prompt_style == "direct":
+        prompt = (
+            "Below are image-label pairs. Exactly one claimed label is incorrect.\n"
+            "Identify which position has the corrupted (wrong) label.\n\n"
+            f"Pairs are labeled {_letter_options(letters)}.\n\n"
+            f"{_render_labeled_images(letters, shown_labels)}\n\n"
+            "Answer with only one letter.\n"
+            f"<answer>{_letter_options(letters)}</answer>"
+        )
+    else:
+        prompt = (
+            "Below are image-label pairs. Exactly one claimed label is incorrect.\n"
+            "Identify which position has the corrupted (wrong) label.\n\n"
+            f"Pairs are labeled {_letter_options(letters)}.\n\n"
+            f"{_render_labeled_images(letters, shown_labels)}\n\n"
+            "Answer with only one letter.\n"
+            f"<answer>{_letter_options(letters)}</answer>"
+        )
 
     return {
         "prompt": prompt,
@@ -1205,7 +1238,13 @@ def gen_b3_label_corruption(rng: random.Random, *, by_label: dict[str, list[VqaI
     }
 
 
-def gen_b4_exemplar_match(rng: random.Random, *, by_label: dict[str, list[VqaItem]], num_candidates: int) -> dict:
+def gen_b4_exemplar_match(
+    rng: random.Random,
+    *,
+    by_label: dict[str, list[VqaItem]],
+    num_candidates: int,
+    prompt_style: PromptStyle = "stepwise",
+) -> dict:
     if num_candidates < 1:
         raise ValueError("num_candidates must be >= 1 for B4")
 
@@ -1239,18 +1278,29 @@ def gen_b4_exemplar_match(rng: random.Random, *, by_label: dict[str, list[VqaIte
     correct_idx = next(i for i, it in enumerate(candidates) if it.image == pos_item.image)
     correct = cand_letters[correct_idx]
 
-    prompt = (
-        "You are a medical VQA assistant.\n\n"
-        f"Reference image ({ref_letter}): <image>\n\n"
-        f"Candidate images, labeled {_letter_options(cand_letters)}:\n\n"
-        + "\n".join([f"({ltr}) Candidate {ltr}: <image>" for ltr in cand_letters])
-        + "\n\n"
-        f"Task (B4 Exemplar-match): Exactly one candidate depicts the same condition as the reference image {ref_letter}.\n"
-        "Which candidate is it?\n\n"
-        "First, identify the condition shown in each image (including the reference).\n"
-        f"Final must be one letter: {_letter_options(cand_letters)}.\n"
-        + _render_stepwise_answer_format(letters, "{one letter}")
-    )
+    if prompt_style == "direct":
+        prompt = (
+            f"Reference image ({ref_letter}): <image>\n\n"
+            f"Candidate images, labeled {_letter_options(cand_letters)}:\n\n"
+            + "\n".join([f"({ltr}) Candidate {ltr}: <image>" for ltr in cand_letters])
+            + "\n\n"
+            f"Task (B4 Exemplar-match): Exactly one candidate depicts the same condition as the reference image {ref_letter}.\n"
+            "Which candidate is it?\n\n"
+            f"Answer with only one letter: {_letter_options(cand_letters)}.\n"
+            f"<answer>{_letter_options(cand_letters)}</answer>"
+        )
+    else:
+        prompt = (
+            f"Reference image ({ref_letter}): <image>\n\n"
+            f"Candidate images, labeled {_letter_options(cand_letters)}:\n\n"
+            + "\n".join([f"({ltr}) Candidate {ltr}: <image>" for ltr in cand_letters])
+            + "\n\n"
+            f"Task (B4 Exemplar-match): Exactly one candidate depicts the same condition as the reference image {ref_letter}.\n"
+            "Which candidate is it?\n\n"
+            "First, identify the condition shown in each image (including the reference).\n"
+            f"Final must be one letter: {_letter_options(cand_letters)}.\n"
+            + _render_stepwise_answer_format(letters, "{one letter}")
+        )
 
     return {
         "prompt": prompt,
@@ -1267,7 +1317,9 @@ def gen_b4_exemplar_match(rng: random.Random, *, by_label: dict[str, list[VqaIte
     }
 
 
-def gen_b5_same_different(rng: random.Random, *, by_label: dict[str, list[VqaItem]], same_prob: float) -> dict:
+def gen_b5_same_different(
+    rng: random.Random, *, by_label: dict[str, list[VqaItem]], same_prob: float, prompt_style: PromptStyle = "stepwise"
+) -> dict:
     labels = sorted(by_label.keys())
     if len(labels) < 2:
         raise ValueError("Need at least 2 labels for B5")
@@ -1288,15 +1340,23 @@ def gen_b5_same_different(rng: random.Random, *, by_label: dict[str, list[VqaIte
         used = [a, b]
 
     letters = ["A", "B"]
-    prompt = (
-        "You are a medical VQA assistant.\n\n"
-        "(A) Image A: <image>\n"
-        "(B) Image B: <image>\n\n"
-        "Task (B5 Same/Different): Do these two images depict the same condition?\n\n"
-        "First, identify the condition shown in each image.\n"
-        "Final must be exactly one token: same or different.\n"
-        + _render_stepwise_answer_format(letters, "{same|different}")
-    )
+    if prompt_style == "direct":
+        prompt = (
+            "(A) Image A: <image>\n"
+            "(B) Image B: <image>\n\n"
+            "Task (B5 Same/Different): Do these two images depict the same condition?\n\n"
+            "Answer with exactly one word: same or different.\n"
+            "<answer>same|different</answer>"
+        )
+    else:
+        prompt = (
+            "(A) Image A: <image>\n"
+            "(B) Image B: <image>\n\n"
+            "Task (B5 Same/Different): Do these two images depict the same condition?\n\n"
+            "First, identify the condition shown in each image.\n"
+            "Final must be exactly one word: same or different.\n"
+            + _render_stepwise_answer_format(letters, "{same|different}")
+        )
 
     return {
         "prompt": prompt,
@@ -1312,7 +1372,9 @@ def gen_b5_same_different(rng: random.Random, *, by_label: dict[str, list[VqaIte
     }
 
 
-def gen_b6_pair_finding(rng: random.Random, *, by_label: dict[str, list[VqaItem]], k: int) -> dict:
+def gen_b6_pair_finding(
+    rng: random.Random, *, by_label: dict[str, list[VqaItem]], k: int, prompt_style: PromptStyle = "stepwise"
+) -> dict:
     if k < 2:
         raise ValueError("k must be >= 2 for B6")
 
@@ -1340,16 +1402,25 @@ def gen_b6_pair_finding(rng: random.Random, *, by_label: dict[str, list[VqaItem]
     pair_letters = sorted([letters[i] for i in idxs])
     correct = " ".join(pair_letters)
 
-    prompt = (
-        "You are a medical VQA assistant.\n\n"
-        f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
-        f"{_render_images(letters)}\n\n"
-        "Task (B6 Pair-finding): Exactly two images depict the same condition; all other images depict different conditions.\n"
-        "Identify the two matching images.\n\n"
-        "First, identify the condition shown in each image.\n"
-        "Final must be exactly two letters separated by a space (order does not matter).\n"
-        + _render_stepwise_answer_format(letters, "{two letters}")
-    )
+    if prompt_style == "direct":
+        prompt = (
+            f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
+            f"{_render_images(letters)}\n\n"
+            "Task (B6 Pair-finding): Exactly two images depict the same condition; all other images depict different conditions.\n"
+            "Identify the two matching images.\n\n"
+            "Answer with exactly two letters separated by a space (order does not matter).\n"
+            "<answer>two letters</answer>"
+        )
+    else:
+        prompt = (
+            f"Below are {k} images, labeled {_letter_options(letters)}.\n\n"
+            f"{_render_images(letters)}\n\n"
+            "Task (B6 Pair-finding): Exactly two images depict the same condition; all other images depict different conditions.\n"
+            "Identify the two matching images.\n\n"
+            "First, identify the condition shown in each image.\n"
+            "Final must be exactly two letters separated by a space (order does not matter).\n"
+            + _render_stepwise_answer_format(letters, "{two letters}")
+        )
 
     return {
         "prompt": prompt,
@@ -1366,7 +1437,9 @@ def gen_b6_pair_finding(rng: random.Random, *, by_label: dict[str, list[VqaItem]
     }
 
 
-def gen_b7_support_set_nway(rng: random.Random, *, by_label: dict[str, list[VqaItem]], n_way: int) -> dict:
+def gen_b7_support_set_nway(
+    rng: random.Random, *, by_label: dict[str, list[VqaItem]], n_way: int, prompt_style: PromptStyle = "stepwise"
+) -> dict:
     if n_way < 2:
         raise ValueError("n_way must be >= 2 for B7")
 
@@ -1396,15 +1469,24 @@ def gen_b7_support_set_nway(rng: random.Random, *, by_label: dict[str, list[VqaI
     support_block = "\n".join(
         [f"({ltr}) Support label: {lbl}\n({ltr}) Support image {ltr}: <image>" for ltr, lbl in zip(letters, support_labels, strict=True)]
     )
-    prompt = (
-        "You are a medical VQA assistant.\n\n"
-        f"Support set (B7 Support-set N-way): There are {n_way} labeled support examples:\n\n"
-        f"{support_block}\n\n"
-        "(Q) Query image: <image>\n\n"
-        "Task: Which support label matches the query image?\n\n"
-        "Answer with only one letter corresponding to the matching support example.\n"
-        f"<answer> {_letter_options(letters)} </answer>"
-    )
+    if prompt_style == "direct":
+        prompt = (
+            f"Support set (B7 Support-set N-way): There are {n_way} labeled support examples:\n\n"
+            f"{support_block}\n\n"
+            "(Q) Query image: <image>\n\n"
+            "Task: Which support label matches the query image?\n\n"
+            "Answer with only one letter corresponding to the matching support example.\n"
+            f"<answer>{_letter_options(letters)}</answer>"
+        )
+    else:
+        prompt = (
+            f"Support set (B7 Support-set N-way): There are {n_way} labeled support examples:\n\n"
+            f"{support_block}\n\n"
+            "(Q) Query image: <image>\n\n"
+            "Task: Which support label matches the query image?\n\n"
+            "Answer with only one letter corresponding to the matching support example.\n"
+            f"<answer>{_letter_options(letters)}</answer>"
+        )
 
     return {
         "prompt": prompt,
@@ -1548,6 +1630,7 @@ def generate_b_tasks(
     b5_same_prob: float,
     b7_nway: int,
     shuffle: bool,
+    prompt_style: PromptStyle = "stepwise",
 ) -> tuple[list[dict], dict]:
     rng = random.Random(seed)
     spaces = build_label_spaces(rows, label_space_by)
@@ -1594,19 +1677,23 @@ def generate_b_tasks(
                 by_lbl = _by_label(items)
                 try:
                     if task == "B1":
-                        row = gen_b1_target_search(rng, by_label=by_lbl, k=k)
+                        row = gen_b1_target_search(rng, by_label=by_lbl, k=k, prompt_style=prompt_style)
                     elif task == "B2":
-                        row = gen_b2_odd_one_out(rng, by_label=by_lbl, k=k)
+                        row = gen_b2_odd_one_out(rng, by_label=by_lbl, k=k, prompt_style=prompt_style)
                     elif task == "B3":
-                        row = gen_b3_label_corruption(rng, by_label=by_lbl, k=k)
+                        row = gen_b3_label_corruption(rng, by_label=by_lbl, k=k, prompt_style=prompt_style)
                     elif task == "B4":
-                        row = gen_b4_exemplar_match(rng, by_label=by_lbl, num_candidates=b4_candidates)
+                        row = gen_b4_exemplar_match(
+                            rng, by_label=by_lbl, num_candidates=b4_candidates, prompt_style=prompt_style
+                        )
                     elif task == "B5":
-                        row = gen_b5_same_different(rng, by_label=by_lbl, same_prob=b5_same_prob)
+                        row = gen_b5_same_different(
+                            rng, by_label=by_lbl, same_prob=b5_same_prob, prompt_style=prompt_style
+                        )
                     elif task == "B6":
-                        row = gen_b6_pair_finding(rng, by_label=by_lbl, k=k)
+                        row = gen_b6_pair_finding(rng, by_label=by_lbl, k=k, prompt_style=prompt_style)
                     elif task == "B7":
-                        row = gen_b7_support_set_nway(rng, by_label=by_lbl, n_way=b7_nway)
+                        row = gen_b7_support_set_nway(rng, by_label=by_lbl, n_way=b7_nway, prompt_style=prompt_style)
                     else:
                         raise ValueError(f"Unhandled task {task}")
                     # Add label-space metadata for tracking.
@@ -1634,6 +1721,7 @@ def generate_b_tasks(
         "b4_candidates": b4_candidates,
         "b5_same_prob": b5_same_prob,
         "b7_nway": b7_nway,
+        "prompt_style": prompt_style,
         "requested": dict(task_counts),
         "generated": len(out_rows),
         "task_failures": dict(task_failures),
@@ -1932,6 +2020,7 @@ def cmd_build_comparative(args: argparse.Namespace) -> None:
         b4_candidates=args.b4_candidates,
         b5_same_prob=args.b5_same_prob,
         b7_nway=args.b7_nway,
+        prompt_style=args.prompt_style,
         shuffle=not args.no_shuffle,
     )
 
@@ -2052,6 +2141,7 @@ def cmd_build_train_mix(args: argparse.Namespace) -> None:
                 b4_candidates=b4_candidates,
                 b5_same_prob=b5_same_prob,
                 b7_nway=b7_nway,
+                prompt_style=str(bcfg.get("prompt_style", "stepwise")),  # type: ignore[arg-type]
                 shuffle=not no_shuffle,
             )
             b_source = "generated"
@@ -2228,6 +2318,13 @@ def build_argparser() -> argparse.ArgumentParser:
     p_comp.add_argument("--b4-candidates", type=int, default=3, help="Num candidates (excluding reference) for B4")
     p_comp.add_argument("--b5-same-prob", type=float, default=0.5, help="P(same) for B5")
     p_comp.add_argument("--b7-nway", type=int, default=5, help="N-way for B7 support-set")
+    p_comp.add_argument(
+        "--prompt-style",
+        type=str,
+        default="stepwise",
+        choices=["stepwise", "direct"],
+        help="Prompt style for B tasks",
+    )
     p_comp.add_argument("--no-shuffle", action="store_true", help="Do not shuffle the final dataset")
     p_comp.set_defaults(func=cmd_build_comparative)
 

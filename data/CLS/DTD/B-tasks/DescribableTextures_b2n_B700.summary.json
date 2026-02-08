@@ -1,0 +1,78 @@
+{
+  "input": "/data/shichao/datasets_b2n/DescribableTextures_b2n_base_test.jsonl",
+  "output": "/data/shichao/EasyR1/data/CLS/DTD/B-tasks/DescribableTextures_b2n_B700.jsonl",
+  "seed": 42,
+  "split": "test",
+  "task_counts_requested": {
+    "B1": 100,
+    "B2": 100,
+    "B3": 100,
+    "B4": 100,
+    "B5": 100,
+    "B6": 100,
+    "B7": 100
+  },
+  "generated_rows": 700,
+  "task_type_counts": {
+    "B5_same_different": 100,
+    "B2_odd_one_out": 100,
+    "B4_exemplar_match": 100,
+    "B3_label_corruption": 100,
+    "B1_target_search": 100,
+    "B7_support_set_nway": 100,
+    "B6_pair_finding": 100
+  },
+  "source_info": {
+    "input": "/data/shichao/datasets_b2n/DescribableTextures_b2n_base_test.jsonl",
+    "rows_after_split": 828,
+    "rows_valid": 828,
+    "rows_skipped_invalid": 0,
+    "labels": 23,
+    "labels_top50": {
+      "banded": 36,
+      "blotchy": 36,
+      "braided": 36,
+      "bubbly": 36,
+      "bumpy": 36,
+      "chequered": 36,
+      "cobwebbed": 36,
+      "cracked": 36,
+      "crosshatched": 36,
+      "crystalline": 36,
+      "dotted": 36,
+      "fibrous": 36,
+      "flecked": 36,
+      "freckled": 36,
+      "frilly": 36,
+      "gauzy": 36,
+      "grid": 36,
+      "grooved": 36,
+      "honeycombed": 36,
+      "interlaced": 36,
+      "knitted": 36,
+      "lacelike": 36,
+      "lined": 36
+    }
+  },
+  "generation_info": {
+    "seed": 42,
+    "label_space_by": "question_type+optioncount",
+    "k": 4,
+    "b4_candidates": 3,
+    "b5_same_prob": 0.5,
+    "b7_nway": 5,
+    "prompt_style": "direct",
+    "requested": {
+      "B1": 100,
+      "B2": 100,
+      "B3": 100,
+      "B4": 100,
+      "B5": 100,
+      "B6": 100,
+      "B7": 100
+    },
+    "generated": 700,
+    "task_failures": {},
+    "num_label_spaces": 1
+  }
+}

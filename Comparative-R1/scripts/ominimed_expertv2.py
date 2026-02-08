@@ -18,18 +18,18 @@ Default paths assume this repo layout:
   <repo_root>/data/OminiMedExpert
 
 Usage (few-shot DTD export, matches data/datasets_fewshot/*.jsonl format):
-  python3 Comparative-R1/scripts/ominimed_expertv2.py \\
-    --omni_root /path/to/OmniMedVQA \\
-    build-fewshot-dtd \\
-    --dataset-regex "ISIC" \\
-    --question-type "Disease Diagnosis" \\
-    --min-option-count 2 \\
-    --max-option-count 4 \\
-    --shots 4 \\
-    --seed 42 \\
-    --label-pool-size 30 \\
-    --skip-missing-images \\
-    --out-dir /path/to/output_dir
+  python3 Comparative-R1/scripts/ominimed_expertv2.py \
+    --omni_root /path/to/OmniMedVQA \
+    build-fewshot-dtd \
+    --dataset-regex "ISIC" \
+    --question-type "Disease Diagnosis" \
+    --min-option-count 2 \
+    --max-option-count 4 \
+    --shots 4 \
+    --seed 42 \
+    --label-pool-size 30 \
+    --skip-missing-images \
+    --out-dir /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC
 """
 
 from __future__ import annotations
@@ -559,7 +559,7 @@ def build_fewshot_problem(question: str, candidate_labels: list[str], *, default
     if not q:
         q = default_question
     labels = [l.strip() for l in candidate_labels if isinstance(l, str) and l.strip()]
-    return f"{q}\nPlease choose one from list [ {', '.join(labels)}]."
+    return f"{q}\nPlease choose one from list [{', '.join(labels)}]."
 
 
 def _sample_candidate_labels(
@@ -583,18 +583,63 @@ def _sample_candidate_labels(
     return candidates
 
 
+def _label_pool_key_from_answer(ans: dict[str, object], by: str) -> str:
+    if by == "all":
+        return "all"
+    qtype = _norm_text(ans.get("question_type", ""))
+    modality = _norm_text(ans.get("modality_type", ""))
+    question = _norm_text(ans.get("question", ""))
+    opt_count = _option_count({k: ans.get(k) for k in OPTION_KEYS})
+    if by == "question_type+modality":
+        return f"question_type={qtype}|modality_type={modality}"
+    if by == "question":
+        return f"question={question}"
+    if by == "option_count":
+        return f"option_count={opt_count}"
+    if by == "question_type+option_count":
+        return f"question_type={qtype}|option_count={opt_count}"
+    return f"question_type={qtype}"
+
+
+def _sample_from_pool_with_label(
+    *,
+    rng: random.Random,
+    pool: list[str],
+    correct_label: str,
+    k: int,
+) -> list[str]:
+    if k <= 0 or k >= len(pool):
+        return list(pool)
+    pool_set = list(dict.fromkeys(pool).keys())
+    if correct_label and correct_label not in pool_set:
+        pool_set.append(correct_label)
+    if k >= len(pool_set):
+        return pool_set
+    if k == 1:
+        return [correct_label] if correct_label else [rng.choice(pool_set)]
+    distractors = [l for l in pool_set if l != correct_label]
+    if len(distractors) >= (k - 1):
+        distractors = rng.sample(distractors, k - 1)
+    candidates = [correct_label, *distractors] if correct_label else rng.sample(pool_set, k)
+    rng.shuffle(candidates)
+    return candidates
+
+
 def _build_fewshot_dtd_rows(
     rows: list[dict],
     *,
     split: str,
     rng: random.Random,
-    label_pool: list[str],
+    label_pools: dict[str, list[str]],
     label_pool_size: int,
+    label_pool_by: str,
+    candidate_source: str,
     default_question: str,
     normalize_labels: bool,
 ) -> tuple[list[dict], dict]:
     out: list[dict] = []
     skipped = 0
+    candidate_source_counts = Counter()
     for r in rows:
         imgs = r.get("images") or []
         if not isinstance(imgs, list) or not imgs or not isinstance(imgs[0], str):
@@ -607,12 +652,50 @@ def _build_fewshot_dtd_rows(
             continue
         prompt = r.get("prompt")
         question = _extract_question_from_prompt(prompt) if isinstance(prompt, str) else ""
-        candidates = _sample_candidate_labels(
-            rng,
-            label_pool=label_pool,
-            correct_label=label,
-            k=label_pool_size,
-        )
+        candidates: list[str] = []
+        if candidate_source == "original_options":
+            candidate_labels: list[str] | None = None
+            if isinstance(ans.get("candidate_labels"), list):
+                candidate_labels = [str(x) for x in ans.get("candidate_labels") if x is not None]
+                candidate_source_counts["candidate_labels"] += 1
+            else:
+                options = _extract_options_for_optionless(ans)
+                if options:
+                    candidate_labels = options
+                    candidate_source_counts["options"] += 1
+
+            if candidate_labels:
+                seen: set[str] = set()
+                for c in candidate_labels:
+                    lbl = _normalize_label_value(c, normalize=normalize_labels)
+                    if not lbl or lbl in seen:
+                        continue
+                    seen.add(lbl)
+                    candidates.append(lbl)
+                if label and label not in seen:
+                    candidates.append(label)
+            else:
+                candidate_source_counts["label_pool_fallback"] += 1
+                pool_key = _label_pool_key_from_answer(ans, label_pool_by)
+                pool = label_pools.get(pool_key) or label_pools.get("all") or []
+                candidates = _sample_from_pool_with_label(
+                    rng=rng,
+                    pool=pool,
+                    correct_label=label,
+                    k=label_pool_size,
+                )
+        else:
+            candidate_source_counts["label_pool"] += 1
+            pool_key = _label_pool_key_from_answer(ans, label_pool_by)
+            pool = label_pools.get(pool_key) or label_pools.get("all") or []
+            candidates = _sample_from_pool_with_label(
+                rng=rng,
+                pool=pool,
+                correct_label=label,
+                k=label_pool_size,
+            )
+        if label and label not in candidates:
+            candidates.append(label)
         problem = build_fewshot_problem(
             question,
             candidates,
@@ -631,6 +714,7 @@ def _build_fewshot_dtd_rows(
         "rows_in": len(rows),
         "rows_out": len(out),
         "rows_skipped": skipped,
+        "candidate_source_counts": dict(candidate_source_counts),
     }
     return out, info
 
@@ -840,6 +924,7 @@ def build_base_rows(
             "question_id": question_id,
             "dataset": dataset,
             "question_type": qtype,
+            "question": question,
             "modality_type": modality,
             "group_id": group_id,
             "group_id_source": group_id_source,
@@ -1684,8 +1769,8 @@ def cmd_build_base(args: argparse.Namespace) -> None:
 def cmd_build_fewshot_dtd(args: argparse.Namespace) -> None:
     if args.shots <= 0:
         raise SystemExit("--shots must be > 0")
-    if args.label_pool_size <= 0:
-        raise SystemExit("--label-pool-size must be > 0")
+    if args.label_pool_size < 0:
+        raise SystemExit("--label-pool-size must be >= 0 (0 means use all labels)")
 
     ds_map = discover_omnimedvqa_datasets(args.omni_root)
     if args.dataset_regex:
@@ -1728,27 +1813,35 @@ def cmd_build_fewshot_dtd(args: argparse.Namespace) -> None:
         rows, shots=args.shots, seed=args.seed
     )
 
-    label_pool_set: set[str] = set()
+    label_pool_by_key: dict[str, set[str]] = defaultdict(set)
     for r in rows:
         if not isinstance(r.get("answer"), dict):
             continue
-        raw_label = r.get("answer", {}).get("label", "")
+        ans = r.get("answer", {})
+        raw_label = ans.get("label", "")
         lbl = _normalize_label_value(raw_label, normalize=args.normalize_labels)
-        if lbl:
-            label_pool_set.add(lbl)
-    label_pool = sorted(label_pool_set)
-    if not label_pool:
+        if not lbl:
+            continue
+        key = _label_pool_key_from_answer(ans, args.label_pool_by)
+        label_pool_by_key[key].add(lbl)
+    if not label_pool_by_key:
         raise SystemExit("No labels found after filtering.")
 
-    label_pool_size = min(args.label_pool_size, len(label_pool))
+    label_pools = {k: sorted(v) for k, v in label_pool_by_key.items()}
+    if "all" not in label_pools:
+        all_labels = sorted({l for v in label_pools.values() for l in v})
+        label_pools["all"] = all_labels
+
     rng = random.Random(args.seed)
 
     train_out, train_info = _build_fewshot_dtd_rows(
         train_rows,
         split="train",
         rng=rng,
-        label_pool=label_pool,
-        label_pool_size=label_pool_size,
+        label_pools=label_pools,
+        label_pool_size=args.label_pool_size,
+        label_pool_by=args.label_pool_by,
+        candidate_source=args.candidate_source,
         default_question=args.default_question,
         normalize_labels=args.normalize_labels,
     )
@@ -1756,8 +1849,10 @@ def cmd_build_fewshot_dtd(args: argparse.Namespace) -> None:
         test_rows,
         split="test",
         rng=rng,
-        label_pool=label_pool,
-        label_pool_size=label_pool_size,
+        label_pools=label_pools,
+        label_pool_size=args.label_pool_size,
+        label_pool_by=args.label_pool_by,
+        candidate_source=args.candidate_source,
         default_question=args.default_question,
         normalize_labels=args.normalize_labels,
     )
@@ -1797,8 +1892,9 @@ def cmd_build_fewshot_dtd(args: argparse.Namespace) -> None:
         "export": {
             "shots": args.shots,
             "label_pool_size_requested": args.label_pool_size,
-            "label_pool_size_effective": label_pool_size,
-            "label_pool_total": len(label_pool),
+            "label_pool_by": args.label_pool_by,
+            "candidate_source": args.candidate_source,
+            "label_pool_total": len(label_pools.get("all", [])),
             "default_question": args.default_question,
             "train_output": str(train_path),
             "test_output": str(test_path),
@@ -2074,13 +2170,37 @@ def build_argparser() -> argparse.ArgumentParser:
     p_few.add_argument("--min-option-count", type=int, default=None, help="Filter by minimum non-empty option count")
     p_few.add_argument("--max-option-count", type=int, default=None, help="Filter by maximum non-empty option count")
     p_few.add_argument("--shots", type=int, required=True, help="K-shot per label for train split")
-    p_few.add_argument("--label-pool-size", type=int, default=30, help="Number of labels to include in prompt list")
+    p_few.add_argument(
+        "--label-pool-size",
+        type=int,
+        default=0,
+        help="Number of labels to include in prompt list (0 means use all labels)",
+    )
+    p_few.add_argument(
+        "--label-pool-by",
+        choices=["all", "question", "question_type", "question_type+modality", "option_count", "question_type+option_count"],
+        default="question",
+        help="How to build the label pool for each question (used when candidate source is label_pool)",
+    )
+    p_few.add_argument(
+        "--candidate-source",
+        choices=["label_pool", "original_options"],
+        default="label_pool",
+        help="Use full label pool or the original options/candidate_labels from the MCQ item",
+    )
     p_few.add_argument("--seed", type=int, default=42)
     p_few.add_argument("--skip-missing-images", action="store_true", help="Skip rows whose image file is missing")
+    p_few.set_defaults(normalize_labels=True)
     p_few.add_argument(
         "--normalize-labels",
         action="store_true",
-        help="Normalize labels (strip trailing '.', remove 'image') before few-shot sampling",
+        help="Normalize labels (strip trailing '.', remove 'image') before few-shot sampling (default)",
+    )
+    p_few.add_argument(
+        "--no-normalize-labels",
+        dest="normalize_labels",
+        action="store_false",
+        help="Disable label normalization",
     )
     p_few.add_argument(
         "--default-question",

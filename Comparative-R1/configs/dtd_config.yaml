@@ -1,14 +1,13 @@
 data:
-  train_files: /mnt/cache/wuruixiao/users/lsc/data/datasets_b2n/DescribableTextures_b2n_4.jsonl
+  train_files: /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/ISIC_fewshot_4.jsonl
   # Default validation set is base test; override to new test for base-to-new reporting.
-  val_files: /mnt/cache/wuruixiao/users/lsc/data/datasets_b2n/DescribableTextures_b2n_base_test.jsonl
+  val_files: /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/ISIC_fewshot_test.jsonl
   prompt_key: problem
   answer_key: label
   image_key: image
   video_key: videos
   # DTD images are typically under `${DTD_ROOT}/images/<class>/<img>.jpg`.
-  image_dir: /mnt/cache/wuruixiao/users/lsc/data/dtd/images
-  video_fps: 2.0
+  image_dir: /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA
   max_prompt_length: 15000
   max_response_length: 1024
   rollout_batch_size: 32  # equivalent to verl's data.train_batch_size

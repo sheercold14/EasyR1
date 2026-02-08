@@ -17,13 +17,22 @@ Usage:
     --val ./data/CLS/DTD/B-tasks/DescribableTextures_b2n_B700.jsonl \
     --out ./checkpoints/Eval-CLS/dtd_b700_thinking_fewshot4_eval \
     --override [worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b,trainer.reward_function=Comparative-R1/reward/dtd_direct_mixed_reward.py:compute_score]
-    
+
 python3 EasyR1/Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
     --config EasyR1/Comparative-R1/configs/omnimed_isic_gspo_taskaware.yaml \
     --val /mnt/cache/wuruixiao/users/lsc/EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test_optionless.jsonl \
     --out EasyR1/checkpoints/eval_runs/isic_pretrain_optionless_test_v2 \
     --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b 
-
+python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
+    --config Comparative-R1/configs/dtd_config.yaml \
+  qwen2_5_7b_dtd_b2n_gspo_thinking/global_step_155 \
+    --mode passthrough \
+    --prompt-key prompt \
+    --answer-key answer \
+    --image-key images \
+    --reward-function Comparative-R1/reward/dtd_direct_mixed_reward.py:compute_score \
+    --format-prompt null \
+    --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
 Notes:
 - This is meant for *single-image* disease diagnosis style tasks (task_type=mcq_letter).
 - Multi-image B tasks are passed through unchanged.
@@ -143,6 +152,11 @@ def run_val_only(
     val_jsonl: Path,
     out_dir: Path,
     experiment_name: str,
+    reward_function: str,
+    prompt_key: str,
+    answer_key: str,
+    image_key: str,
+    format_prompt: Optional[str],
     extra_overrides: list[str],
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -153,13 +167,23 @@ def run_val_only(
         "trainer.val_only=true",
         "trainer.val_before_train=true",
         "trainer.val_generations_to_log=1000000000",
+        # val_only still builds train dataset in current pipeline,
+        # so keep train/val schema aligned.
+        f"data.train_files={val_jsonl}",
         f"data.val_files={val_jsonl}",
+        f"data.prompt_key={prompt_key}",
+        f"data.answer_key={answer_key}",
+        f"data.image_key={image_key}",
+        "data.shuffle=false",
         f"trainer.save_checkpoint_path={out_dir}",
         f"trainer.experiment_name={experiment_name}",
         "trainer.find_last_checkpoint=false",
-        # swap reward for optionless scoring
-        "worker.reward.reward_function=Comparative-R1/reward/omnimed_isic_optionless_reward_v1.py:compute_score",
+        f"worker.reward.reward_function={reward_function}",
     ]
+    if format_prompt is None:
+        overrides.append("data.format_prompt=null")
+    else:
+        overrides.append(f"data.format_prompt={format_prompt}")
     if checkpoint is not None:
         overrides.append(f"trainer.load_checkpoint_path={checkpoint}")
     overrides.extend(extra_overrides)
@@ -330,6 +354,27 @@ def main() -> None:
     ap.add_argument("--name", type=str, default=None)
     ap.add_argument("--analyze-only", action="store_true", help="Skip running veRL; only parse existing generations.log.")
     ap.add_argument("--keep-transformed", action="store_true", help="Keep the transformed val jsonl in out dir.")
+    ap.add_argument(
+        "--mode",
+        choices=["optionless", "passthrough"],
+        default="optionless",
+        help="optionless: rewrite mcq_letter rows; passthrough: keep val file unchanged",
+    )
+    ap.add_argument("--prompt-key", type=str, default="prompt", help="data.prompt_key override for veRL")
+    ap.add_argument("--answer-key", type=str, default="answer", help="data.answer_key override for veRL")
+    ap.add_argument("--image-key", type=str, default="images", help="data.image_key override for veRL")
+    ap.add_argument(
+        "--reward-function",
+        type=str,
+        default="Comparative-R1/reward/omnimed_isic_optionless_reward_v1.py:compute_score",
+        help="worker.reward.reward_function override",
+    )
+    ap.add_argument(
+        "--format-prompt",
+        type=str,
+        default=None,
+        help="Optional data.format_prompt path; default null (disabled)",
+    )
     ap.add_argument("--override", action="append", default=[])
     args = ap.parse_args()
 
@@ -347,15 +392,18 @@ def main() -> None:
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    in_rows = _read_jsonl(val_jsonl)
-    out_rows, info = transform_val_jsonl_optionless(in_rows)
-
-    transformed_val = out_dir / f"{val_jsonl.stem}.optionless.jsonl"
-    _write_jsonl(transformed_val, out_rows)
-    (out_dir / f"{val_jsonl.stem}.optionless.summary.json").write_text(
-        json.dumps({"input": str(val_jsonl), "output": str(transformed_val), "info": info}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    if args.mode == "optionless":
+        in_rows = _read_jsonl(val_jsonl)
+        out_rows, info = transform_val_jsonl_optionless(in_rows)
+        transformed_val = out_dir / f"{val_jsonl.stem}.optionless.jsonl"
+        _write_jsonl(transformed_val, out_rows)
+        (out_dir / f"{val_jsonl.stem}.optionless.summary.json").write_text(
+            json.dumps({"input": str(val_jsonl), "output": str(transformed_val), "info": info}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    else:
+        transformed_val = val_jsonl
+        info = {"mode": "passthrough", "rewritten_mcq": 0}
 
     ckpt_name = checkpoint.name if checkpoint is not None else "pretrained"
     exp_name = args.name or f"eval_optionless_{ckpt_name}_{val_jsonl.stem}"
@@ -367,6 +415,11 @@ def main() -> None:
             val_jsonl=transformed_val,
             out_dir=out_dir,
             experiment_name=exp_name,
+            reward_function=args.reward_function,
+            prompt_key=args.prompt_key,
+            answer_key=args.answer_key,
+            image_key=args.image_key,
+            format_prompt=args.format_prompt,
             extra_overrides=args.override,
         )
 
@@ -396,7 +449,12 @@ def main() -> None:
         "out": str(out_dir),
         "num_samples": len(samples),
         "experiment_name": exp_name,
-        "reward_function": "Comparative-R1/reward/omnimed_isic_optionless_reward_v1.py:compute_score",
+        "mode": args.mode,
+        "prompt_key": args.prompt_key,
+        "answer_key": args.answer_key,
+        "image_key": args.image_key,
+        "reward_function": args.reward_function,
+        "format_prompt": args.format_prompt,
     }
     stats_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
 

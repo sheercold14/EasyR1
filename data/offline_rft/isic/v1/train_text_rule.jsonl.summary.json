@@ -1,0 +1,18 @@
+{
+  "labels": [
+    "Actinic keratosis",
+    "Basal cell carcinoma",
+    "Benign",
+    "Benign keratosis",
+    "Dermatofibroma",
+    "Malignant",
+    "Melanocytic nevus",
+    "Melanoma",
+    "Squamous cell carcinoma",
+    "Vascular lesion"
+  ],
+  "num_output_rows": 5,
+  "teacher_model": "qwen3-max",
+  "prompt_version": "text_rule_v1",
+  "config_path": "/data/shichao/EasyR1/Comparative-R1/scripts/ReMAP/config/text_rule_config.json"
+}

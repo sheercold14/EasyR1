@@ -1,0 +1,121 @@
+{
+  "rules": [
+    {
+      "rule_id": "ak_surface_scale",
+      "question": "Does actinic keratosis typically present with surface scale?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["scale", "actinic keratosis"],
+      "evidence_snippet": "Actinic keratosis often shows surface scale."
+    },
+    {
+      "rule_id": "bcc_pigment_network",
+      "question": "Is a pigment network commonly seen in basal cell carcinoma?",
+      "answer_type": "bool",
+      "correct_answer": "no",
+      "candidate_answers": [],
+      "keywords": ["pigment network", "BCC"],
+      "evidence_snippet": "Basal cell carcinoma lacks a typical pigment network."
+    },
+    {
+      "rule_id": "bk_exclude_malignancy",
+      "question": "Is benign keratosis considered malignant?",
+      "answer_type": "bool",
+      "correct_answer": "no",
+      "candidate_answers": [],
+      "keywords": ["benign keratosis", "malignant"],
+      "evidence_snippet": "Benign keratosis is non-malignant."
+    },
+    {
+      "rule_id": "df_firm_consistency",
+      "question": "Is dermatofibroma typically firm on palpation?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["dermatofibroma", "firm"],
+      "evidence_snippet": "Dermatofibroma presents as a firm papule."
+    },
+    {
+      "rule_id": "mn_symmetry",
+      "question": "Is melanocytic nevus usually symmetric?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["melanocytic nevus", "symmetry"],
+      "evidence_snippet": "Melanocytic nevi are typically symmetric."
+    },
+    {
+      "rule_id": "melanoma_asymmetry",
+      "question": "Is asymmetry a common feature of melanoma?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["melanoma", "asymmetry"],
+      "evidence_snippet": "Melanoma often shows asymmetry in shape or color."
+    },
+    {
+      "rule_id": "scc_ulceration",
+      "question": "Does squamous cell carcinoma frequently show ulceration?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["squamous cell carcinoma", "ulceration"],
+      "evidence_snippet": "Squamous cell carcinoma may present with ulceration."
+    },
+    {
+      "rule_id": "vl_red_color",
+      "question": "Are vascular lesions typically red or purple?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["vascular lesion", "red", "purple"],
+      "evidence_snippet": "Vascular lesions are commonly red or purple due to blood vessels."
+    },
+    {
+      "rule_id": "exclude_melanoma_if_symmetric",
+      "question": "Is melanoma less likely when the lesion is symmetric?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["melanoma", "symmetric", "exclusion"],
+      "evidence_snippet": "Exclude melanoma if the lesion is clearly symmetric."
+    },
+    {
+      "rule_id": "exclude_bcc_if_pigment_network",
+      "question": "Should basal cell carcinoma be excluded if a pigment network is present?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["BCC", "pigment network", "exclude"],
+      "evidence_snippet": "Exclude basal cell carcinoma if a pigment network is observed."
+    },
+    {
+      "rule_id": "ak_vs_scc_differentiation",
+      "question": "Is invasion into the dermis a key feature distinguishing SCC from actinic keratosis?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["SCC", "actinic keratosis", "dermal invasion"],
+      "evidence_snippet": "Squamous cell carcinoma invades the dermis; actinic keratosis is confined to the epidermis."
+    },
+    {
+      "rule_id": "df_dimple_sign",
+      "question": "Does dermatofibroma often show a dimple sign when pinched?",
+      "answer_type": "bool",
+      "correct_answer": "yes",
+      "candidate_answers": [],
+      "keywords": ["dermatofibroma", "dimple sign"],
+      "evidence_snippet": "Dermatofibroma may exhibit a central dimple when lateral pressure is applied."
+    },
+    {
+      "rule_id": "mn_multiple_colors",
+      "question": "Is melanocytic nevus typically multicolored?",
+      "answer_type": "bool",
+      "correct_answer": "no",
+      "candidate_answers": [],
+      "keywords": ["melanocytic nevus", "color uniformity"],
+      "evidence_snippet": "Melanocytic nevi usually have uniform pigmentation."
+    },
+    {
+      "rule_id": "melanoma_blue_whitish

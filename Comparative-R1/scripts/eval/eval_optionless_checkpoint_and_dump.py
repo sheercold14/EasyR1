@@ -23,6 +23,7 @@ python3 EasyR1/Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.p
     --val /mnt/cache/wuruixiao/users/lsc/EasyR1/data/OminiMedExpert/isic_disease_diagnosis_v1_0.05/test_optionless.jsonl \
     --out EasyR1/checkpoints/eval_runs/isic_pretrain_optionless_test_v2 \
     --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b 
+
 python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
     --config Comparative-R1/configs/dtd_config.yaml \
   qwen2_5_7b_dtd_b2n_gspo_thinking/global_step_155 \

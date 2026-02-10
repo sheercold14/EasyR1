@@ -1,0 +1,96 @@
+{
+  "raw": "{\n  \"rules\": [\n    {\n      \"rule_id\": \"ak_crust\",\n      \"question\": \"Is the lesion typically scaly or crusty?\",\n      \"answer_type\": \"bool\",\n      \"correct_answer\": \"yes\",\n      \"candidate_answers\": [\"yes\", \"no\"],\n      \"keywords\": [\"actinic keratosis\", \"scale\", \"crust\"],\n      \"evidence_snippet\": \"Actinic keratosis lesions are often scaly or crusty.\"\n    },\n    {\n      \"rule_id\": \"bcc_pearly\",\n      \"question\": \"Does the lesion commonly present with a pearly appearance?\",\n      \"answer_type\": \"bool\",\n      \"correct_answer\": \"yes\",\n      \"candidate_answers\": [\"yes\", \"no\"],\n      \"keywords\": [\"basal cell carcinoma\", \"pearly\", \"translucent\"],\n      \"evidence_snippet\": \"Basal cell carcinoma frequently exhibits a pearly or translucent border.\"\n    },\n    {\n      \"rule_id\": \"melanoma_asymmetry\",\n      \"question\": \"Is asymmetry a common feature of this lesion?\",\n      \"answer_type\": \"bool\",\n      \"correct_answer\": \"yes\",\n      \"candidate_answers\": [\"yes\", \"no\"],\n      \"keywords\": [\"melanoma\", \"asymmetry\", \"ABCDE\"],\n      \"evidence_snippet\": \"Melanoma is often asymmetric in shape.\"\n    },\n    {\n      \"rule_id\": \"nevus_benign_features\",\n      \"question\": \"Which features are typical of a benign melanocytic nevus?\",\n      \"answer_type\": \"list\",\n      \"correct_answer\": [\"symmetry\", \"uniform color\", \"smooth borders\"],\n      \"candidate_answers\": [\"symmetry\", \"uniform color\", \"smooth borders\", \"rapid growth\", \"ulceration\"],\n      \"keywords\": [\"melanocytic nevus\", \"benign\", \"symmetry\"],\n      \"evidence_snippet\": \"Melanocytic nevi are typically symmetric, uniformly pigmented, and have smooth borders.\"\n    },\n    {\n      \"rule_id\": \"exclude_melanoma_if_stable\",\n      \"question\": \"Is melanoma less likely when the lesion has been stable for years?\",\n      \"answer_type\": \"bool\",\n      \"correct_answer\": \"yes\",\n      \"candidate_answers\": [\"yes\", \"no\"],\n      \"keywords\": [\"melanoma\", \"stable\", \"long-standing\"],\n      \"evidence_snippet\": \"Exclude melanoma if the lesion has remained unchanged for many years.\"\n    }\n  ]\n}",
+  "parsed": {
+    "rules": [
+      {
+        "rule_id": "ak_crust",
+        "question": "Is the lesion typically scaly or crusty?",
+        "answer_type": "bool",
+        "correct_answer": "yes",
+        "candidate_answers": [
+          "yes",
+          "no"
+        ],
+        "keywords": [
+          "actinic keratosis",
+          "scale",
+          "crust"
+        ],
+        "evidence_snippet": "Actinic keratosis lesions are often scaly or crusty."
+      },
+      {
+        "rule_id": "bcc_pearly",
+        "question": "Does the lesion commonly present with a pearly appearance?",
+        "answer_type": "bool",
+        "correct_answer": "yes",
+        "candidate_answers": [
+          "yes",
+          "no"
+        ],
+        "keywords": [
+          "basal cell carcinoma",
+          "pearly",
+          "translucent"
+        ],
+        "evidence_snippet": "Basal cell carcinoma frequently exhibits a pearly or translucent border."
+      },
+      {
+        "rule_id": "melanoma_asymmetry",
+        "question": "Is asymmetry a common feature of this lesion?",
+        "answer_type": "bool",
+        "correct_answer": "yes",
+        "candidate_answers": [
+          "yes",
+          "no"
+        ],
+        "keywords": [
+          "melanoma",
+          "asymmetry",
+          "ABCDE"
+        ],
+        "evidence_snippet": "Melanoma is often asymmetric in shape."
+      },
+      {
+        "rule_id": "nevus_benign_features",
+        "question": "Which features are typical of a benign melanocytic nevus?",
+        "answer_type": "list",
+        "correct_answer": [
+          "symmetry",
+          "uniform color",
+          "smooth borders"
+        ],
+        "candidate_answers": [
+          "symmetry",
+          "uniform color",
+          "smooth borders",
+          "rapid growth",
+          "ulceration"
+        ],
+        "keywords": [
+          "melanocytic nevus",
+          "benign",
+          "symmetry"
+        ],
+        "evidence_snippet": "Melanocytic nevi are typically symmetric, uniformly pigmented, and have smooth borders."
+      },
+      {
+        "rule_id": "exclude_melanoma_if_stable",
+        "question": "Is melanoma less likely when the lesion has been stable for years?",
+        "answer_type": "bool",
+        "correct_answer": "yes",
+        "candidate_answers": [
+          "yes",
+          "no"
+        ],
+        "keywords": [
+          "melanoma",
+          "stable",
+          "long-standing"
+        ],
+        "evidence_snippet": "Exclude melanoma if the lesion has remained unchanged for many years."
+      }
+    ]
+  },
+  "model": "qwen3-max",
+  "cache_key": "508f392b3c1955ff59099f178b72dc38948848d60b7b13f11459869aa8708a92"
+}

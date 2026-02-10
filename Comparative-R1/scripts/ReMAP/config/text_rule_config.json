@@ -1,0 +1,14 @@
+{
+  "cls_jsonl": "/data/shichao/EasyR1/data/CLS/ISIC/ISIC_fewshot_4.jsonl",
+  "guideline_path": "/data/shichao/EasyR1/Comparative-R1/scripts/ReMAP/text_bridge_source.template.md",
+  "output_jsonl": "/data/shichao/EasyR1/data/offline_rft/isic/v1/train_text_rule.jsonl",
+  "cache_dir": "/data/shichao/EasyR1/data/offline_rft/isic/v1/cache_text_rule",
+  "api_model": "qwen3-max",
+  "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "api_key_jsonl": "/data/shichao/api_key.jsonl",
+  "api_timeout": 60,
+  "num_families": 5,
+  "prompt_version": "text_rule_exec_family_v1",
+  "temperature": 0.0,
+  "max_tokens": 2500
+}

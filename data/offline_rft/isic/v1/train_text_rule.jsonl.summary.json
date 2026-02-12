@@ -1,18 +1,264 @@
 {
-  "labels": [
-    "Actinic keratosis",
-    "Basal cell carcinoma",
-    "Benign",
-    "Benign keratosis",
-    "Dermatofibroma",
-    "Malignant",
-    "Melanocytic nevus",
-    "Melanoma",
-    "Squamous cell carcinoma",
-    "Vascular lesion"
-  ],
-  "num_output_rows": 5,
-  "teacher_model": "qwen3-max",
-  "prompt_version": "text_rule_v1",
-  "config_path": "/data/shichao/EasyR1/Comparative-R1/scripts/ReMAP/config/text_rule_config.json"
+  "generated_at_utc": "2026-02-12T10:43:52.409489+00:00",
+  "input_jsonl": "/data/shichao/EasyR1/data/offline_rft/isic/v1/train_text_rule.jsonl",
+  "total_lines": 555,
+  "blank_lines": 0,
+  "parsed_rows": 555,
+  "task_type_counts": {
+    "text_rule": 555
+  },
+  "source_type_counts": {
+    "text_rule": 555
+  },
+  "answer_type_counts": {
+    "boolean": 336,
+    "text": 114,
+    "short_list": 105
+  },
+  "scope_counts": {
+    "general": 225,
+    "class": 330
+  },
+  "class_label_counts": {
+    "Actinic keratosis": 39,
+    "Basal cell carcinoma": 36,
+    "Benign": 36,
+    "Benign keratosis": 30,
+    "Dermatofibroma": 33,
+    "Malignant": 30,
+    "Melanocytic nevus": 33,
+    "Melanoma": 30,
+    "Squamous cell carcinoma": 33,
+    "Vascular lesion": 30
+  },
+  "teacher_model_counts": {
+    "qwen3-max": 555
+  },
+  "prompt_version_counts": {
+    "text_rule_qa_groups_text_v2": 555
+  },
+  "evidence_source_counts": {
+    "guideline": 555
+  },
+  "evidence_path_counts": {
+    "/data/shichao/EasyR1/Comparative-R1/scripts/ReMAP/text_bridge_source.template.md": 555
+  },
+  "origin_guideline_counts": {
+    "/data/shichao/EasyR1/Comparative-R1/scripts/ReMAP/text_bridge_source.template.md": 555
+  },
+  "batch_index": {
+    "missing_rows": 15,
+    "invalid_rows": 0,
+    "min": 1,
+    "max": 37,
+    "distinct_count": 37
+  },
+  "group_stats": {
+    "distinct_group_id_count": 185,
+    "rows_per_group_min": 3,
+    "rows_per_group_max": 3,
+    "rows_per_group_avg": 3.0,
+    "groups_not_3_rows_count": 0,
+    "groups_not_3_rows_examples": {},
+    "groups_not_3_variants_count": 0,
+    "groups_not_3_variants_examples": {},
+    "groups_scope_conflict_count": 0,
+    "groups_scope_conflict_examples": {},
+    "groups_label_conflict_count": 0,
+    "groups_label_conflict_examples": {},
+    "groups_answer_type_conflict_count": 0,
+    "groups_answer_type_conflict_examples": {},
+    "groups_correct_answer_conflict_count": 0,
+    "groups_correct_answer_conflict_examples": {},
+    "groups_answer_options_conflict_count": 0,
+    "groups_answer_options_conflict_examples": {},
+    "groups_variant_suffix_not_exact_v1_v2_v3_count": 0,
+    "groups_variant_suffix_not_exact_v1_v2_v3_examples": {},
+    "duplicate_prompt_count": 8,
+    "duplicate_prompt_examples": [
+      {
+        "count": 2,
+        "prompt_preview": "As an expert in Dermoscopy image classification\n\nQuestion: Is 'Actinic keratosis' one of the valid diagnostic labels for dermoscopy image classification according to the provided label list?\n\nAnswer with exactly one toke...(truncated)",
+        "occurrences": [
+          {
+            "line": 16,
+            "group_id": "GEN_003",
+            "variant_id": "GEN_003_v1"
+          },
+          {
+            "line": 247,
+            "group_id": "GEN_034",
+            "variant_id": "GEN_034_v1"
+          }
+        ]
+      },
+      {
+        "count": 2,
+        "prompt_preview": "As an expert in Dermoscopy image classification\n\nQuestion: Is 'Psoriasis' included in the official label list for dermoscopy image classification?\n\nAnswer with exactly one token: yes or no.\nUse format: <answer>...</answe...(truncated)",
+        "occurrences": [
+          {
+            "line": 19,
+            "group_id": "GEN_004",
+            "variant_id": "GEN_004_v1"
+          },
+          {
+            "line": 256,
+            "group_id": "GEN_035",
+            "variant_id": "GEN_035_v1"
+          }
+        ]
+      },
+      {
+        "count": 2,
+        "prompt_preview": "As an expert in Dermoscopy image classification\n\nQuestion: Is surface scale a recognized dermoscopic feature of Actinic keratosis?\n\nAnswer with exactly one token: yes or no.\nUse format: <answer>...</answer>",
+        "occurrences": [
+          {
+            "line": 44,
+            "group_id": "GEN_006",
+            "variant_id": "GEN_006_v2"
+          },
+          {
+            "line": 165,
+            "group_id": "GEN_023",
+            "variant_id": "GEN_023_v3"
+          }
+        ]
+      },
+      {
+        "count": 2,
+        "prompt_preview": "As an expert in Dermoscopy image classification\n\nQuestion: Select all dermoscopic features that are important characteristics of Squamous cell carcinoma.\n\nCandidate terms (copy exact term text; do not add extra words):\n-...(truncated)",
+        "occurrences": [
+          {
+            "line": 52,
+            "group_id": "LBL_SQUAMOUS_CELL_CARCINOMA_001",
+            "variant_id": "LBL_SQUAMOUS_CELL_CARCINOMA_001_v1"
+          },
+          {
+            "line": 487,
+            "group_id": "LBL_SQUAMOUS_CELL_CARCINOMA_010",
+            "variant_id": "LBL_SQUAMOUS_CELL_CARCINOMA_010_v1"
+          }
+        ]
+      },
+      {
+        "count": 2,
+        "prompt_preview": "As an expert in Dermoscopy image classification\n\nQuestion: Which of the following dermoscopic findings are indicative of Squamous cell carcinoma? Choose all that apply.\n\nCandidate terms (copy exact term text; do not add ...(truncated)",
+        "occurrences": [
+          {
+            "line": 53,
+            "group_id": "LBL_SQUAMOUS_CELL_CARCINOMA_001",
+            "variant_id": "LBL_SQUAMOUS_CELL_CARCINOMA_001_v2"
+          },
+          {
+            "line": 488,
+            "group_id": "LBL_SQUAMOUS_CELL_CARCINOMA_010",
+            "variant_id": "LBL_SQUAMOUS_CELL_CARCINOMA_010_v2"
+          }
+        ]
+      },
+      {
+        "count": 2,
+        "prompt_preview": "As an expert in Dermoscopy image classification\n\nQuestion: Identify the dermoscopic features commonly associated with Squamous cell carcinoma from the list below.\n\nCandidate terms (copy exact term text; do not add extra ...(truncated)",
+        "occurrences": [
+          {
+            "line": 54,
+            "group_id": "LBL_SQUAMOUS_CELL_CARCINOMA_001",
+            "variant_id": "LBL_SQUAMOUS_CELL_CARCINOMA_001_v3"
+          },
+          {
+            "line": 489,
+            "group_id": "LBL_SQUAMOUS_CELL_CARCINOMA_010",
+            "variant_id": "LBL_SQUAMOUS_CELL_CARCINOMA_010_v3"
+          }
+        ]
+      },
+      {
+        "count": 2,
+        "prompt_preview": "As an expert in Dermoscopy image classification\n\nQuestion: Which dermoscopic features are commonly associated with actinic keratosis? Select all that apply from: Strawberry pattern, Linear or wavy blood vessels, Rosette ...(truncated)",
+        "occurrences": [
+          {
+            "line": 64,
+            "group_id": "LBL_ACTINIC_KERATOSIS_003",
+            "variant_id": "LBL_ACTINIC_KERATOSIS_003_v1"
+          },
+          {
+            "line": 352,
+            "group_id": "LBL_ACTINIC_KERATOSIS_009",
+            "variant_id": "LBL_ACTINIC_KERATOSIS_009_v1"
+          }
+        ]
+      },
+      {
+        "count": 2,
+        "prompt_preview": "As an expert in Dermoscopy image classification\n\nQuestion: Are linear or wavy blood vessels considered a common dermoscopic feature of Actinic keratosis?\n\nAnswer with exactly one token: yes or no.\nUse format: <answer>......(truncated)",
+        "occurrences": [
+          {
+            "line": 154,
+            "group_id": "GEN_022",
+            "variant_id": "GEN_022_v1"
+          },
+          {
+            "line": 271,
+            "group_id": "GEN_037",
+            "variant_id": "GEN_037_v1"
+          }
+        ]
+      }
+    ],
+    "duplicate_variant_id_count": 0
+  },
+  "problem_counts": {
+    "missing_batch_index": 15,
+    "duplicate_prompt_count": 8
+  },
+  "problem_examples": {
+    "missing_batch_index": [
+      {
+        "line": 1
+      },
+      {
+        "line": 2
+      },
+      {
+        "line": 3
+      },
+      {
+        "line": 4
+      },
+      {
+        "line": 5
+      },
+      {
+        "line": 6
+      },
+      {
+        "line": 7
+      },
+      {
+        "line": 8
+      },
+      {
+        "line": 9
+      },
+      {
+        "line": 10
+      },
+      {
+        "line": 11
+      },
+      {
+        "line": 12
+      },
+      {
+        "line": 13
+      },
+      {
+        "line": 14
+      },
+      {
+        "line": 15
+      }
+    ]
+  },
+  "has_problems": true
 }

@@ -34,7 +34,7 @@ Each JSONL row should be:
 
 2. `text_rule`
 - Source: guideline text + label set.
-- Answers: `bool`, `short_text`, `list`.
+- Answers: `boolean` (yes/no), `text` (single term), `short_list` (multiple terms).
 - Optional: `answer.keywords`, `answer.evidence_snippet`.
 
 3. `cls` (optional passthrough)

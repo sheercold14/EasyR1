@@ -1,7 +1,7 @@
 {
   "input_jsonl": "/data/shichao/EasyR1/data/CLS/ISIC/ISIC_fewshot_4.jsonl",
   "output_jsonl": "/data/shichao/EasyR1/data/offline_rft/isic/v1/train_attr.jsonl",
-  "image_root": "/tmp/shared-storage/lishichao/data/OmniMedVQA",
+  "image_root": "/data/shichao/data/OmniMedVQA",
   "cache_dir": "/data/shichao/EasyR1/data/offline_rft/isic/v1/cache_attr",
   "api_model": "qwen-vl-max-latest",
   "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",

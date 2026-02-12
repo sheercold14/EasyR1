@@ -1,5 +1,8 @@
 {
   "total_base_rows": 40,
-  "generated_attr_rows": 0,
-  "skipped_rows": 40
+  "generated_attr_rows": 160,
+  "skipped_rows": 0,
+  "image_root": "/data/shichao/data/OmniMedVQA",
+  "config_path": "/data/shichao/EasyR1/Comparative-R1/scripts/ReMAP/config/attr_config.json",
+  "missing_image_examples": []
 }

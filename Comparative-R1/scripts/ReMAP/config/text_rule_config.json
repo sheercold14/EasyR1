@@ -1,14 +1,29 @@
 {
+  "task_name": "Dermoscopy image classification",
   "cls_jsonl": "/data/shichao/EasyR1/data/CLS/ISIC/ISIC_fewshot_4.jsonl",
   "guideline_path": "/data/shichao/EasyR1/Comparative-R1/scripts/ReMAP/text_bridge_source.template.md",
   "output_jsonl": "/data/shichao/EasyR1/data/offline_rft/isic/v1/train_text_rule.jsonl",
+  "output_mode": "append",
   "cache_dir": "/data/shichao/EasyR1/data/offline_rft/isic/v1/cache_text_rule",
   "api_model": "qwen3-max",
   "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
   "api_key_jsonl": "/data/shichao/api_key.jsonl",
   "api_timeout": 60,
-  "num_families": 5,
-  "prompt_version": "text_rule_exec_family_v1",
-  "temperature": 0.0,
+  "num_groups_total": 200,
+  "batch_groups": 5,
+  "batch_scope_quota": {
+    "general": 2,
+    "class": 3
+  },
+  "batch_answer_type_quota": {
+    "boolean": 3,
+    "text": 1,
+    "short_list": 1
+  },
+  "guideline_focus_num_blocks": 8,
+  "guideline_focus_strict": false,
+  "progress_every_batches": 1,
+  "prompt_version": "text_rule_qa_groups_text_v2",
+  "temperature": 0.4,
   "max_tokens": 2500
 }

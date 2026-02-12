@@ -19,17 +19,17 @@ Default paths assume this repo layout:
 
 Usage (few-shot DTD export, matches data/datasets_fewshot/*.jsonl format):
   python3 Comparative-R1/scripts/ominimed_expertv2.py \
-    --omni_root /path/to/OmniMedVQA \
+    --omni_root /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA \
     build-fewshot-dtd \
     --dataset-regex "ISIC" \
     --question-type "Disease Diagnosis" \
     --min-option-count 2 \
     --max-option-count 4 \
-    --shots 4 \
+    --shots 16 \
     --seed 42 \
     --label-pool-size 30 \
     --skip-missing-images \
-    --out-dir /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC
+    --out-dir /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/16shots
 """
 
 from __future__ import annotations

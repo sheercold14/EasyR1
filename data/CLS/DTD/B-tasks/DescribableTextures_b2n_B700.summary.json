@@ -1,6 +1,6 @@
 {
-  "input": "/data/shichao/datasets_b2n/DescribableTextures_b2n_base_test.jsonl",
-  "output": "/data/shichao/EasyR1/data/CLS/DTD/B-tasks/DescribableTextures_b2n_B700.jsonl",
+  "input": "data/datasets_b2n/DescribableTextures_b2n_base_test.jsonl",
+  "output": "EasyR1/data/CLS/DTD/B-tasks/DescribableTextures_b2n_B700.jsonl",
   "seed": 42,
   "split": "test",
   "task_counts_requested": {
@@ -23,7 +23,7 @@
     "B6_pair_finding": 100
   },
   "source_info": {
-    "input": "/data/shichao/datasets_b2n/DescribableTextures_b2n_base_test.jsonl",
+    "input": "data/datasets_b2n/DescribableTextures_b2n_base_test.jsonl",
     "rows_after_split": 828,
     "rows_valid": 828,
     "rows_skipped_invalid": 0,

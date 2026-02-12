@@ -1,7 +1,7 @@
 data:
-  train_files: /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/ISIC_fewshot_4.jsonl
+  train_files: /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/16shots/ISIC_fewshot_16.jsonl
   # Default validation set is base test; override to new test for base-to-new reporting.
-  val_files: /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/ISIC_fewshot_test.jsonl
+  val_files: /mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/16shots/ISIC_fewshot_test.jsonl
   prompt_key: problem
   answer_key: label
   image_key: image

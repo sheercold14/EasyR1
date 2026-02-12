@@ -7,10 +7,10 @@ set -x
 
 # Path to your base model (local path or HF-style id if your environment supports it).
 MODEL_PATH=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
-FORMAT_PROMPT=/mnt/cache/wuruixiao/users/lsc/EasyR1/Comparative-R1/prompts/dtd_nothinking.jinja
+FORMAT_PROMPT=/mnt/cache/wuruixiao/users/lsc/EasyR1/Comparative-R1/prompts/dtd.jinja
 REWARD_FUNCTION=/mnt/cache/wuruixiao/users/lsc/EasyR1/Comparative-R1/reward/dtd_noformat.py
 # EXPERIMENT_NAME="qwen2_5_7b_dtd_b2n_gspo_thinking"
-EXPERIMENT_NAME="qwen2_5_7b_isic_gspo"
+EXPERIMENT_NAME="qwen2_5_7b_isic_gspo_thinking_16shots"
 IMAGE_DIR=/mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA
 # Optional: resume from an existing checkpoint (leave empty to train from MODEL_PATH).
 # LOAD_CHECKPOINT_PATH=

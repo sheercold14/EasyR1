@@ -1,0 +1,67 @@
+{
+  "datasets": [
+    "ISIC2018",
+    "ISIC2019",
+    "ISIC2020"
+  ],
+  "filters": {
+    "question_type": [
+      "Disease Diagnosis"
+    ],
+    "modality_type": [],
+    "min_option_count": 2,
+    "max_option_count": 4
+  },
+  "build": {
+    "total_raw_items": 3804,
+    "written_rows": 3022,
+    "skipped_filter": 782,
+    "invalid_items": 0,
+    "missing_images": 0,
+    "missing_answer_id": 0,
+    "omni_root": "/mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA"
+  },
+  "label_normalization": {
+    "normalized": true,
+    "rows_in": 3022,
+    "rows_out": 3022,
+    "labels_changed": 1107,
+    "rows_dropped": 0
+  },
+  "fewshot_split": {
+    "mode": "fewshot_train_rest_test",
+    "shots": 16,
+    "seed": 42,
+    "train_rows": 160,
+    "test_rows": 2862,
+    "labels": 10
+  },
+  "export": {
+    "shots": 16,
+    "label_pool_size_requested": 30,
+    "label_pool_by": "question",
+    "candidate_source": "label_pool",
+    "label_pool_total": 10,
+    "default_question": "What is the diagnosis shown in the image?",
+    "train_output": "/mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/16shots/ISIC_fewshot_16.jsonl",
+    "test_output": "/mnt/cache/wuruixiao/users/lsc/EasyR1/data/CLS/ISIC/16shots/ISIC_fewshot_test.jsonl",
+    "train_info": {
+      "split": "train",
+      "rows_in": 160,
+      "rows_out": 160,
+      "rows_skipped": 0,
+      "candidate_source_counts": {
+        "label_pool": 160
+      }
+    },
+    "test_info": {
+      "split": "test",
+      "rows_in": 2862,
+      "rows_out": 2862,
+      "rows_skipped": 0,
+      "candidate_source_counts": {
+        "label_pool": 2862
+      }
+    }
+  }
+}

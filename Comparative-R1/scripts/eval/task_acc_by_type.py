@@ -15,8 +15,7 @@ Correctness is determined in the following priority:
 
 Example:
   python ./Comparative-R1/scripts/eval/task_acc_by_type.py \
-    --run-dir /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/Eval-CLS/dtd_eval_multi_thinking
-"""
+    --run-dir /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/Eval-CLS/dtd_abase_pretrain_eval"""
 
 from __future__ import annotations
 

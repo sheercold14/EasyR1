@@ -8,8 +8,15 @@ from pathlib import Path
 from typing import Any
 
 """
-python3 Comparative-R1/scripts/ReMAP/convert_fewshot_dtd_to_offline_rft.py --input /data/shichao/EasyR1/data/CLS/ISIC/
-            ISIC_fewshot_4.jsonl --output /data/shichao/EasyR1/data/offline_rft/isic/v1/train_cls_fewshot.jsonl
+Convert DTD-style few-shot JSONL to offline_rft JSONL.
+
+This script primarily reshapes keys; by default it does NOT modify the original
+prompt text (no extra system text, no literal "<image>", no extra instructions).
+
+Example:
+  python3 Comparative-R1/scripts/ReMAP/convert_fewshot_dtd_to_offline_rft.py \
+    --input /data/shichao/EasyR1/data/CLS/ISIC/4shot/ISIC_fewshot_test.dtd_nothinking.jsonl \
+    --output /data/shichao/EasyR1/data/offline_rft/isic/v1/test_4shot_nothinking.jsonl
 
 """
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -62,11 +69,12 @@ def _strip_choose_one_tail(problem: str) -> str:
     return _RE_CHOOSE_ONE.sub("", problem).strip()
 
 
-def _build_prompt(problem: str, *, system: str, answer_instruction: str) -> str:
+def _build_prompt(problem: str, *, system: str, answer_instruction: str, add_image_placeholder: bool) -> str:
     lines: list[str] = []
     if system.strip():
         lines.append(system.strip())
-    lines.append("<image>")
+    if add_image_placeholder:
+        lines.append("<image>")
     lines.append(problem.strip())
     if answer_instruction.strip():
         lines.append(answer_instruction.strip())
@@ -84,16 +92,32 @@ def main() -> None:
     p.add_argument("--output", required=True, type=Path, help="Output offline_rft JSONL.")
     p.add_argument("--id-prefix", type=str, default="cls_", help="sample_id prefix.")
     p.add_argument(
+        "--prompt-mode",
+        type=str,
+        choices=["raw", "wrapped"],
+        default="raw",
+        help=(
+            "Prompt transformation mode. "
+            "`raw` keeps the original prompt text verbatim (recommended). "
+            "`wrapped` adds optional system text + optional <image> + optional answer instructions."
+        ),
+    )
+    p.add_argument(
         "--system",
         type=str,
-        default="You are a medical VQA assistant for dermoscopy images.",
+        default="",
         help="System header line for prompt (stored in prompt text).",
     )
     p.add_argument(
         "--answer-instruction",
         type=str,
-        default="Answer with ONLY the label text.\nUse format: <answer>...</answer>",
+        default="",
         help="Answer instruction appended to prompt.",
+    )
+    p.add_argument(
+        "--add-image-placeholder",
+        action="store_true",
+        help="(wrapped mode only) Add a literal '<image>' line before the problem text.",
     )
     p.add_argument(
         "--strip-candidates-from-prompt",
@@ -129,7 +153,16 @@ def main() -> None:
         total_candidates += len(candidate_labels)
 
         prompt_problem = _strip_choose_one_tail(problem) if (args.strip_candidates_from_prompt and problem) else problem
-        prompt = _build_prompt(prompt_problem or problem or "", system=args.system, answer_instruction=args.answer_instruction)
+        if args.prompt_mode == "wrapped":
+            prompt = _build_prompt(
+                prompt_problem or problem or "",
+                system=args.system,
+                answer_instruction=args.answer_instruction,
+                add_image_placeholder=bool(args.add_image_placeholder),
+            )
+        else:
+            # Only reshape keys; do not inject extra prompt tokens like "<image>".
+            prompt = (prompt_problem or problem or "").strip()
 
         sample_id = f"{args.id_prefix}{line_idx:06d}"
         out_rows.append(
@@ -165,6 +198,8 @@ def main() -> None:
         "missing_problem": missing_problem,
         "avg_candidate_labels_per_row": (total_candidates / len(rows)) if rows else 0.0,
         "strip_candidates_from_prompt": bool(args.strip_candidates_from_prompt),
+        "prompt_mode": str(args.prompt_mode),
+        "add_image_placeholder": bool(args.add_image_placeholder),
     }
 
     if args.dry_run:
@@ -172,11 +207,10 @@ def main() -> None:
         return
 
     _write_jsonl(args.output, out_rows)
-    summary_path = args.output.parent / f"{args.output.stem}.summary.json"
-    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    # summary_path = args.output.parent / f"{args.output.stem}.summary.json"
+    # summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    # print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
     main()
-

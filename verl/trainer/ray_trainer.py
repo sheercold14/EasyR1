@@ -561,7 +561,7 @@ class RayPPOTrainer:
             self.critic_wg.load_checkpoint(critic_path)
 
         dataloader_path = os.path.join(load_checkpoint_path, "dataloader.pt")
-        if os.path.exists(dataloader_path):
+        if getattr(self.config.trainer, "resume_dataloader_state", True) and os.path.exists(dataloader_path):
             dataloader_state_dict = torch.load(dataloader_path, weights_only=False)
             self.train_dataloader.load_state_dict(dataloader_state_dict)
         else:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,41 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as file_obj:
         for row in rows:
             file_obj.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _append_jsonl_rows(file_obj: Any, rows: list[dict[str, Any]]) -> None:
+    for row in rows:
+        file_obj.write(json.dumps(row, ensure_ascii=False) + "\n")
+    file_obj.flush()
+
+
+def _write_progress(
+    file_obj: Any,
+    *,
+    base_index: int,
+    total_base_rows: int,
+    image_rel: str,
+    status: str,
+    generated_rows: int,
+    filtered_rows: int,
+    skipped_rows: int,
+    total_generated_rows: int,
+    message: str = "",
+) -> None:
+    payload = {
+        "ts_utc": datetime.now(timezone.utc).isoformat(),
+        "base_index": base_index,
+        "total_base_rows": total_base_rows,
+        "image_rel": image_rel,
+        "status": status,
+        "generated_rows": generated_rows,
+        "filtered_rows": filtered_rows,
+        "skipped_rows": skipped_rows,
+        "total_generated_rows": total_generated_rows,
+        "message": message,
+    }
+    file_obj.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    file_obj.flush()
 
 
 def _load_config(path: Path) -> dict[str, Any]:
@@ -92,6 +128,39 @@ def _parse_list_from_prompt(prompt: str) -> list[str]:
     return [item for item in candidates if item]
 
 
+def _normalize_free_text(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.strip().lower()).strip()
+
+
+def _contains_label_text(text: str, labels: list[str]) -> bool:
+    normalized = f" {_normalize_free_text(text)} "
+    for label in labels:
+        label_norm = _normalize_free_text(label)
+        if not label_norm:
+            continue
+        if f" {label_norm} " in normalized:
+            return True
+    return False
+
+
+def _is_diagnostic_attr(
+    *,
+    question: str,
+    correct_answer: str | list[str],
+    candidate_answers: list[str],
+    labels: list[str],
+) -> bool:
+    diagnostic_pattern = re.compile(
+        r"\b(diagnos(?:is|e|tic)?|class(?:ification|ify|ified)?|category|label|disease|condition|benign|malignant)\b",
+        flags=re.IGNORECASE,
+    )
+    answer_text = ", ".join(correct_answer) if isinstance(correct_answer, list) else correct_answer
+    merged = "\n".join([question, answer_text, " ".join(candidate_answers)])
+    if diagnostic_pattern.search(question):
+        return True
+    return _contains_label_text(merged, labels)
+
+
 def _resolve_image_path(image_rel: str, image_root: str | None) -> Path:
     path = Path(image_rel)
     if path.is_absolute():
@@ -112,16 +181,16 @@ def _build_teacher_prompt(
     class_label = _extract_label(row)
     allowed = ", ".join(labels) if labels else "N/A"
     return f"""
-You are generating verifiable supervision for dermatology diagnosis training.
+You are generating image-grounded supervision for dermatology reasoning.
 
 Prompt version: {prompt_version}
-Task question:
+Primary task question (for context only):
 {task_prompt}
 
-Ground-truth diagnosis label:
+Ground-truth diagnosis label (context only; DO NOT ask this directly):
 {class_label}
 
-Allowed diagnosis labels:
+Allowed diagnosis labels (context only; DO NOT use as question/answer options):
 {allowed}
 
 Return STRICT JSON object with this schema:
@@ -141,6 +210,10 @@ Return STRICT JSON object with this schema:
 Constraints:
 - Generate at most {max_questions} attributes.
 - Each question must be answerable from the given image and task.
+- Ask ONLY visual attributes or visual-understanding details that support the task (e.g., color, border, asymmetry, texture, morphology, distribution, count, location, relative size).
+- Do NOT ask diagnostic/classification/category questions.
+- Do NOT ask for disease name, class label, benign/malignant judgement, or "which option from label list".
+- Do NOT include diagnosis labels in question/candidate_answers/correct_answer.
 - Keep answers deterministic and short.
 - For bool, use only yes or no.
 - For list, use 2-5 comma-separated items.
@@ -187,95 +260,198 @@ def main() -> None:
 
     labels = sorted({label for label in (_extract_label(row) for row in rows) if label})
     client = TeacherClient.from_config(config, cache_dir=cache_dir)
+    progress_jsonl = Path(str(output_jsonl) + ".progress.jsonl")
+    output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+    progress_jsonl.parent.mkdir(parents=True, exist_ok=True)
+    output_jsonl.write_text("", encoding="utf-8")
+    progress_jsonl.write_text("", encoding="utf-8")
 
-    out_rows: list[dict[str, Any]] = []
-    stats = {"total_base_rows": len(rows), "generated_attr_rows": 0, "skipped_rows": 0}
+    stats = {
+        "total_base_rows": len(rows),
+        "processed_base_rows": 0,
+        "generated_attr_rows": 0,
+        "skipped_rows": 0,
+        "filtered_diagnostic_attrs": 0,
+        "progress_jsonl": str(progress_jsonl),
+    }
     missing_image_examples: list[str] = []
-    for index, row in enumerate(rows):
-        image_rel = _extract_image_rel(row)
-        image_path = _resolve_image_path(image_rel, image_root)
-        if not image_path.exists():
-            stats["skipped_rows"] += 1
-            if len(missing_image_examples) < 10:
-                missing_image_examples.append(str(image_path))
-            continue
+    with output_jsonl.open("a", encoding="utf-8") as output_file_obj, progress_jsonl.open("a", encoding="utf-8") as progress_file_obj:
+        for index, row in enumerate(rows):
+            stats["processed_base_rows"] += 1
+            row_generated_rows: list[dict[str, Any]] = []
+            row_filtered = 0
+            image_rel = ""
+            status = "ok"
+            message = ""
+            try:
+                image_rel = _extract_image_rel(row)
+                image_path = _resolve_image_path(image_rel, image_root)
+                if not image_path.exists():
+                    stats["skipped_rows"] += 1
+                    if len(missing_image_examples) < 10:
+                        missing_image_examples.append(str(image_path))
+                    status = "missing_image"
+                    message = f"image not found: {image_path}"
+                    _write_progress(
+                        progress_file_obj,
+                        base_index=index,
+                        total_base_rows=len(rows),
+                        image_rel=image_rel,
+                        status=status,
+                        generated_rows=0,
+                        filtered_rows=0,
+                        skipped_rows=stats["skipped_rows"],
+                        total_generated_rows=stats["generated_attr_rows"],
+                        message=message,
+                    )
+                    print(
+                        f"[{index + 1}/{len(rows)}] status={status} generated=0 "
+                        f"filtered=0 total_generated={stats['generated_attr_rows']}"
+                    )
+                    continue
 
-        task_prompt = _build_teacher_prompt(
-            row,
-            labels=labels or _parse_list_from_prompt(_extract_prompt_text(row)),
-            max_questions=max_questions,
-            prompt_version=prompt_version,
-        )
-        result = client.chat_json(
-            user_prompt=task_prompt,
-            image_paths=[image_path],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        parsed = result["parsed"]
-        attributes = parsed.get("attributes", [])
-        if not isinstance(attributes, list):
-            stats["skipped_rows"] += 1
-            continue
+                row_labels = labels or _parse_list_from_prompt(_extract_prompt_text(row))
+                task_prompt = _build_teacher_prompt(
+                    row,
+                    labels=row_labels,
+                    max_questions=max_questions,
+                    prompt_version=prompt_version,
+                )
+                result = client.chat_json(
+                    user_prompt=task_prompt,
+                    image_paths=[image_path],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                parsed = result["parsed"]
+                attributes = parsed.get("attributes", [])
+                if not isinstance(attributes, list):
+                    stats["skipped_rows"] += 1
+                    status = "invalid_teacher_schema"
+                    message = "parsed.attributes is not a list"
+                    _write_progress(
+                        progress_file_obj,
+                        base_index=index,
+                        total_base_rows=len(rows),
+                        image_rel=image_rel,
+                        status=status,
+                        generated_rows=0,
+                        filtered_rows=0,
+                        skipped_rows=stats["skipped_rows"],
+                        total_generated_rows=stats["generated_attr_rows"],
+                        message=message,
+                    )
+                    print(
+                        f"[{index + 1}/{len(rows)}] image={image_rel} status={status} generated=0 "
+                        f"filtered=0 total_generated={stats['generated_attr_rows']}"
+                    )
+                    continue
 
-        for attr_index, attr in enumerate(attributes):
-            if not isinstance(attr, dict):
+                for attr_index, attr in enumerate(attributes):
+                    if not isinstance(attr, dict):
+                        continue
+                    question = str(attr.get("question", "")).strip()
+                    correct_answer = attr.get("correct_answer", "")
+                    answer_type = _normalize_answer_type(str(attr.get("answer_type", "short_text")))
+                    if not question:
+                        continue
+                    if isinstance(correct_answer, list):
+                        normalized_answer: str | list[str] = [str(item).strip() for item in correct_answer if str(item).strip()]
+                    else:
+                        normalized_answer = str(correct_answer).strip()
+                    candidate_answers_raw = attr.get("candidate_answers", [])
+                    if isinstance(candidate_answers_raw, list):
+                        candidate_answers = [str(item).strip() for item in candidate_answers_raw if str(item).strip()]
+                    else:
+                        candidate_answers = []
+                    keywords_raw = attr.get("keywords", [])
+                    if isinstance(keywords_raw, list):
+                        keywords = [str(item).strip().lower() for item in keywords_raw if str(item).strip()]
+                    else:
+                        keywords = []
+                    if _is_diagnostic_attr(
+                        question=question,
+                        correct_answer=normalized_answer,
+                        candidate_answers=candidate_answers,
+                        labels=row_labels,
+                    ):
+                        row_filtered += 1
+                        stats["filtered_diagnostic_attrs"] += 1
+                        continue
+
+                    sample_id = f"attr_{index:06d}_{attr_index:02d}"
+                    row_generated_rows.append(
+                        {
+                            "prompt": _build_student_prompt(question, answer_type, candidate_answers),
+                            "images": [image_rel],
+                            "answer": {
+                                "task_type": "attr",
+                                "source_type": "attr",
+                                "attr_id": str(attr.get("attr_id", sample_id)),
+                                "answer_type": answer_type,
+                                "correct_answer": normalized_answer,
+                                "candidate_answers": candidate_answers,
+                                "keywords": keywords,
+                                "class_label": _extract_label(row),
+                            },
+                            "meta": {
+                                "source_type": "attr",
+                                "sample_id": sample_id,
+                                "origin_input": str(input_jsonl),
+                                "teacher_model": client.config.model,
+                                "prompt_version": prompt_version,
+                                "image_path": image_rel,
+                            },
+                        }
+                    )
+
+                if row_generated_rows:
+                    _append_jsonl_rows(output_file_obj, row_generated_rows)
+                stats["generated_attr_rows"] += len(row_generated_rows)
+                _write_progress(
+                    progress_file_obj,
+                    base_index=index,
+                    total_base_rows=len(rows),
+                    image_rel=image_rel,
+                    status=status,
+                    generated_rows=len(row_generated_rows),
+                    filtered_rows=row_filtered,
+                    skipped_rows=stats["skipped_rows"],
+                    total_generated_rows=stats["generated_attr_rows"],
+                )
+                print(
+                    f"[{index + 1}/{len(rows)}] image={image_rel} status={status} generated={len(row_generated_rows)} "
+                    f"filtered={row_filtered} total_generated={stats['generated_attr_rows']}"
+                )
+            except Exception as exc:
+                stats["skipped_rows"] += 1
+                status = "error"
+                message = str(exc)
+                _write_progress(
+                    progress_file_obj,
+                    base_index=index,
+                    total_base_rows=len(rows),
+                    image_rel=image_rel,
+                    status=status,
+                    generated_rows=0,
+                    filtered_rows=row_filtered,
+                    skipped_rows=stats["skipped_rows"],
+                    total_generated_rows=stats["generated_attr_rows"],
+                    message=message,
+                )
+                print(
+                    f"[{index + 1}/{len(rows)}] image={image_rel or '<unknown>'} status={status} generated=0 "
+                    f"filtered={row_filtered} total_generated={stats['generated_attr_rows']} error={message}"
+                )
                 continue
-            question = str(attr.get("question", "")).strip()
-            correct_answer = attr.get("correct_answer", "")
-            answer_type = _normalize_answer_type(str(attr.get("answer_type", "short_text")))
-            if not question:
-                continue
-            if isinstance(correct_answer, list):
-                normalized_answer: str | list[str] = [str(item).strip() for item in correct_answer if str(item).strip()]
-            else:
-                normalized_answer = str(correct_answer).strip()
-            candidate_answers_raw = attr.get("candidate_answers", [])
-            if isinstance(candidate_answers_raw, list):
-                candidate_answers = [str(item).strip() for item in candidate_answers_raw if str(item).strip()]
-            else:
-                candidate_answers = []
-            keywords_raw = attr.get("keywords", [])
-            if isinstance(keywords_raw, list):
-                keywords = [str(item).strip().lower() for item in keywords_raw if str(item).strip()]
-            else:
-                keywords = []
-
-            sample_id = f"attr_{index:06d}_{attr_index:02d}"
-            out_rows.append(
-                {
-                    "prompt": _build_student_prompt(question, answer_type, candidate_answers),
-                    "images": [image_rel],
-                    "answer": {
-                        "task_type": "attr",
-                        "source_type": "attr",
-                        "attr_id": str(attr.get("attr_id", sample_id)),
-                        "answer_type": answer_type,
-                        "correct_answer": normalized_answer,
-                        "candidate_answers": candidate_answers,
-                        "keywords": keywords,
-                        "class_label": _extract_label(row),
-                    },
-                    "meta": {
-                        "source_type": "attr",
-                        "sample_id": sample_id,
-                        "origin_input": str(input_jsonl),
-                        "teacher_model": client.config.model,
-                        "prompt_version": prompt_version,
-                        "image_path": image_rel,
-                    },
-                }
-            )
-
-    stats["generated_attr_rows"] = len(out_rows)
     stats["image_root"] = image_root or ""
     stats["config_path"] = str(config_path)
     stats["missing_image_examples"] = missing_image_examples
-    _write_jsonl(output_jsonl, out_rows)
 
     summary_path = Path(str(output_jsonl) + ".summary.json")
     summary_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Wrote {len(out_rows)} rows -> {output_jsonl}")
+    print(f"Wrote {stats['generated_attr_rows']} rows -> {output_jsonl}")
+    print(f"Progress -> {progress_jsonl}")
     print(f"Summary -> {summary_path}")
 
 

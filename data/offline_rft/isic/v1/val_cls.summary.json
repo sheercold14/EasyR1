@@ -1,0 +1,11 @@
+{
+  "input": "/data/shichao/EasyR1/data/CLS/ISIC/ISIC_fewshot_test.jsonl",
+  "output": "/data/shichao/EasyR1/data/offline_rft/isic/v1/val_cls.jsonl",
+  "total_input_rows": 2982,
+  "total_output_rows": 2982,
+  "missing_image": 0,
+  "missing_label": 0,
+  "missing_problem": 0,
+  "avg_candidate_labels_per_row": 5.577464788732394,
+  "strip_candidates_from_prompt": true
+}

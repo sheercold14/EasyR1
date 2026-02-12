@@ -1,7 +1,10 @@
 {
   "total_base_rows": 40,
-  "generated_attr_rows": 160,
+  "processed_base_rows": 40,
+  "generated_attr_rows": 240,
   "skipped_rows": 0,
+  "filtered_diagnostic_attrs": 0,
+  "progress_jsonl": "/data/shichao/EasyR1/data/offline_rft/isic/v1/train_attr.jsonl.progress.jsonl",
   "image_root": "/data/shichao/data/OmniMedVQA",
   "config_path": "/data/shichao/EasyR1/Comparative-R1/scripts/ReMAP/config/attr_config.json",
   "missing_image_examples": []

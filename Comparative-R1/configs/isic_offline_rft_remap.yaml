@@ -1,0 +1,151 @@
+data:
+  # Mixed offline_rft JSONL (cls + attr + text_rule) produced by your mixing script.
+  # Override via CLI: data.train_files=/path/to/train_mix.jsonl
+  train_files: /data/shichao/EasyR1/data/offline_rft/isic/v1/train_mix.jsonl
+
+  # Validation is typically cls-only (open-text label) to match your main metric.
+  # Override via CLI: data.val_files=/path/to/val_cls.jsonl
+  val_files: /data/shichao/EasyR1/data/offline_rft/isic/v1/val_cls.jsonl
+
+  # offline_rft schema
+  prompt_key: prompt
+  answer_key: answer
+  image_key: images
+  video_key: videos
+
+  # Root that contains the "Images/..." directory referenced by JSONL.
+  # For this machine: /data/shichao/data/OmniMedVQA
+  image_dir: /data/shichao/data/OmniMedVQA
+
+  video_fps: 2.0
+  max_prompt_length: 8192
+  max_response_length: 256
+  rollout_batch_size: 32
+  mini_rollout_batch_size: null
+  val_batch_size: 16
+
+  # Optional prompt wrapper:
+  # - does NOT inject "<image>" for text-only rows (e.g., text_rule)
+  # - adds missing cls output-format reminders only when absent in the raw prompt
+  format_prompt: ./Comparative-R1/prompts/remap_isic.jinja
+  override_chat_template: null
+
+  shuffle: true
+  seed: 42
+
+  # Speed knob: downscale large images.
+  # 512*512 = 262144
+  # Tip: keep min_pixels=null to avoid upscaling small images (faster).
+  min_pixels: null
+  max_pixels: 262144
+
+  filter_overlong_prompts: true
+  filter_overlong_prompts_workers: 16
+
+algorithm:
+  adv_estimator: grpo
+  disable_kl: true
+  use_kl_loss: false
+  kl_penalty: low_var_kl
+  kl_coef: 0.0
+  online_filtering: false
+  filter_key: overall
+  filter_low: 0.01
+  filter_high: 0.99
+
+  # Multi-task stabilization (optional, but recommended for mixed training).
+  # This scales *advantages* by task_type (survives GRPO normalization).
+  task_adv_ops_enable: true
+  task_adv_weights:
+    cls: 2.0
+    attr: 1.0
+    text_rule: 1.0
+    "*": 1.0
+
+  # If you see one task dominating gradients, try enabling per-task whitening:
+  adv_per_task_whiten: false
+  adv_per_task_whiten_eps: 1.0e-8
+  adv_per_task_whiten_min_count: 32
+
+worker:
+  actor:
+    loss_type: gspo_token
+    loss_avg_mode: seq
+    clip_ratio_low: 3e-4
+    clip_ratio_high: 4e-4
+    global_batch_size: 32
+    micro_batch_size_per_device_for_update: 1
+    micro_batch_size_per_device_for_experience: 2
+    max_grad_norm: 1.0
+    padding_free: true
+    dynamic_batching: true
+    ulysses_size: 1
+    model:
+      # IMPORTANT: use a VL model (needs Processor) because cls/attr are image-grounded.
+      # Override via CLI to your local checkpoint folder if needed.
+      model_path: Qwen/Qwen2.5-VL-7B-Instruct
+      enable_gradient_checkpointing: true
+      trust_remote_code: true
+      freeze_vision_tower: false
+    optim:
+      lr: 1.0e-6
+      weight_decay: 1.0e-2
+      strategy: adamw
+      lr_warmup_ratio: 0.0
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: true
+      offload_optimizer: true
+
+  rollout:
+    n: 4
+    temperature: 0.7
+    top_p: 0.9
+    # Our tasks are single-image or text-only; keep it tight for memory.
+    limit_images: 1
+    gpu_memory_utilization: 0.7
+    enforce_eager: false
+    enable_chunked_prefill: false
+    tensor_parallel_size: 1
+    disable_tqdm: false
+    val_override_config:
+      temperature: 0.6
+      top_p: 0.95
+      n: 1
+    max_num_batched_tokens: 9216
+
+  ref:
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: true
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+
+  reward:
+    reward_function: Comparative-R1/reward/ReMAP/offline_rft_mixed_reward_v1.py:compute_score
+    reward_function_kwargs:
+      list_score_mode: f1
+
+trainer:
+  total_epochs: 200
+  max_steps: null
+  project_name: CLS-RL
+  experiment_name: isic_offline_rft_remap_mixed
+  logger: ["file", "swanlab"]
+  nnodes: 1
+  n_gpus_per_node: 4
+  max_try_make_batch: 20
+  val_freq: 5
+  val_before_train: true
+  val_only: false
+  val_generations_to_log: 6
+  save_freq: 5
+  save_limit: 2
+  save_model_only: false
+  save_checkpoint_path: null
+  load_checkpoint_path: null
+  find_last_checkpoint: true

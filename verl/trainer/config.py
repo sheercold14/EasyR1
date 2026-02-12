@@ -163,6 +163,9 @@ class TrainerConfig:
     find_last_checkpoint: bool = True
     """automatically find the last checkpoint in the save checkpoint path to resume training"""
 
+    resume_dataloader_state: bool = True
+    """If true, restore dataloader/sampler state when resuming from a checkpoint."""
+
     # ---- Reporting stability knobs (optional) ----
     task_metrics_enable: bool = False
     """If true, log stable per-task metrics (EMA + rolling-window + epoch aggregation when possible)."""

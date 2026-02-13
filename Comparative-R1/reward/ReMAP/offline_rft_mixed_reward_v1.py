@@ -226,7 +226,13 @@ def compute_score(
             acc = 1.0 if (pred_b is not None and gt_b is not None and pred_b == gt_b) else 0.0
         elif answer_type == "list":
             pred_items = _parse_list_items(answer_text)
-            gold_items = _to_list(gold)
+            # NOTE: HuggingFace datasets / PyArrow cannot load a JSONL where the same column
+            # alternates between string and array types. If `correct_answer` was normalized to
+            # a string (e.g., "a, b, c"), parse it back here.
+            if isinstance(gold, list):
+                gold_items = _to_list(gold)
+            else:
+                gold_items = _parse_list_items(_normalize_ws(str(gold)))
             # For list-like tasks with candidate options, normalize to candidate surface forms if possible.
             options = _candidate_list_from_gt(gt) or []
             if options:

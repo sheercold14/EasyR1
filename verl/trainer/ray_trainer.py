@@ -238,6 +238,84 @@ def apply_task_aware_advantage_ops(
     return data
 
 
+def _to_float_list(values: Any) -> list[float] | None:
+    if not isinstance(values, list):
+        return None
+    out: list[float] = []
+    for v in values:
+        if isinstance(v, (int, float, np.floating, np.integer)):
+            out.append(float(v))
+        else:
+            return None
+    return out
+
+
+def compute_rollout_correct_ratio_metrics(
+    uids: Any, reward_metrics: dict[str, list[float]], rollout_n: int
+) -> dict[str, float]:
+    """
+    Compute per-step correctness-ratio metrics over rollout groups.
+
+    For each prompt uid, aggregate correctness over repeated rollouts:
+      ratio(uid) = mean(correct_i over rollouts for this uid)
+    """
+    correct_key = None
+    correct_values: list[float] | None = None
+    for key in ("accuracy", "acc", "correct", "is_correct"):
+        values = _to_float_list(reward_metrics.get(key))
+        if values is not None:
+            correct_key = key
+            correct_values = values
+            break
+    if correct_key is None or correct_values is None:
+        return {}
+
+    try:
+        uid_list = uids.tolist()
+    except Exception:
+        uid_list = list(uids)
+
+    if len(uid_list) != len(correct_values):
+        return {}
+
+    uid2scores = defaultdict(list)
+    for uid, score in zip(uid_list, correct_values):
+        uid2scores[uid].append(float(score))
+
+    ratios: list[float] = []
+    exact_n = True
+    binary_like = True
+    for scores in uid2scores.values():
+        if len(scores) != int(rollout_n):
+            exact_n = False
+        if any((s < -1e-6) or (s > 1.0 + 1e-6) for s in scores):
+            binary_like = False
+        ratios.append(float(np.mean(scores)))
+
+    if not ratios:
+        return {}
+
+    arr = np.array(ratios, dtype=np.float32)
+    out: dict[str, float] = {
+        "rollout_correct_ratio/mean": float(np.mean(arr)),
+        "rollout_correct_ratio/std": float(np.std(arr)),
+        "rollout_correct_ratio/min": float(np.min(arr)),
+        "rollout_correct_ratio/max": float(np.max(arr)),
+        "rollout_correct_ratio/p25": float(np.percentile(arr, 25)),
+        "rollout_correct_ratio/p50": float(np.percentile(arr, 50)),
+        "rollout_correct_ratio/p75": float(np.percentile(arr, 75)),
+        "rollout_correct_ratio/num_prompts": float(len(ratios)),
+    }
+    # Optional bucketization when rollout count is fixed and correctness looks like [0,1].
+    if exact_n and binary_like and rollout_n > 0:
+        num_prompts = float(len(ratios))
+        for k in range(rollout_n + 1):
+            target = k / rollout_n
+            cnt = int(np.isclose(arr, target, atol=1e-6).sum())
+            out[f"rollout_correct_ratio/bin_{k}_of_{rollout_n}"] = cnt / num_prompts
+    return out
+
+
 class TaskMetricsReporter:
     """
     Build stable per-task curves from per-step (correct, total) counts.
@@ -824,6 +902,13 @@ class RayPPOTrainer:
                         # get token level scores asynchronously
                         reward_tensor, reward_metrics = ray.get(reward_ref)
                         batch.batch["token_level_scores"] = reward_tensor
+                        metrics.update(
+                            compute_rollout_correct_ratio_metrics(
+                                uids=batch.non_tensor_batch["uid"],
+                                reward_metrics=reward_metrics,
+                                rollout_n=self.config.worker.rollout.n,
+                            )
+                        )
                         reward_metrics = {f"reward/{k}": v for k, v in reduce_metrics(reward_metrics).items()}
                         metrics.update(reward_metrics)
 

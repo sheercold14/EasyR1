@@ -1,0 +1,13 @@
+{
+  "input": "EasyR1/data/offline_rft/isic/v1/train_mix_all.jsonl",
+  "output": "EasyR1/data/offline_rft/isic/v1/train_mix_all.jsonl",
+  "total_nonempty_lines": 835,
+  "written_lines": 835,
+  "json_errors": 0,
+  "missing_answer": 0,
+  "missing_correct_answer": 0,
+  "changed_lines": 105,
+  "list_to_string": 105,
+  "none_to_empty": 0,
+  "join_sep": ", "
+}

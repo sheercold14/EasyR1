@@ -15,8 +15,8 @@ prompt text (no extra system text, no literal "<image>", no extra instructions).
 
 Example:
   python3 Comparative-R1/scripts/ReMAP/convert_fewshot_dtd_to_offline_rft.py \
-    --input /data/shichao/EasyR1/data/CLS/ISIC/4shot/ISIC_fewshot_test.dtd_nothinking.jsonl \
-    --output /data/shichao/EasyR1/data/offline_rft/isic/v1/test_4shot_nothinking.jsonl
+    --input data/CLS/ISIC/4shot/ISIC_fewshot_test.dtd_thinking.jsonl \
+    --output data/offline_rft/isic/v1/test_4shot_thinking.jsonl
 
 """
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

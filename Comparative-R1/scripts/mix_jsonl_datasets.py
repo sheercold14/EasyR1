@@ -9,10 +9,10 @@ Examples
 --------
 1) Simple concatenate (then shuffle):
   python EasyR1/Comparative-R1/scripts/mix_jsonl_datasets.py \
-    --inputs /data/shichao/EasyR1/data/offline_rft/isic/v1/4shot_nothinking.jsonl \
-    --inputs /data/shichao/EasyR1/data/offline_rft/isic/v1/train_attr.jsonl \
-    --inputs /data/shichao/EasyR1/data/offline_rft/isic/v1/train_text_rule.jsonl \
-    --output /data/shichao/EasyR1/data/offline_rft/isic/v1/train_mix_all.jsonl \
+    --inputs EasyR1/data/offline_rft/isic/v1/4shot_nothinking.jsonl \
+    --inputs EasyR1/data/offline_rft/isic/v1/train_attr.jsonl \
+    --inputs EasyR1/data/offline_rft/isic/v1/train_text_rule.jsonl \
+    --output EasyR1/data/offline_rft/isic/v1/train_mix_all.jsonl \
     --shuffle --seed 42
 
 2) Sample a fixed total with a ratio (60% single, 40% comparative):

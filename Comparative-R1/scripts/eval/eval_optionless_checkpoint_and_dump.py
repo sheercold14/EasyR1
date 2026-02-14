@@ -29,7 +29,35 @@ python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
 python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
         --val /mnt/cache/wuruixiao/users/lsc/data/datasets_b2n/DescribableTextures_b2n_base_test.jsonl \
     --out ./checkpoints/Eval-CLS/dtd_abase_pretrain_eval \
+# Pretrain model
+# B tasks
+python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
+        --val /mnt/cache/wuruixiao/users/lsc/data/datasets_b2n/DescribableTextures_b2n_base_test.jsonl \
+    --out ./checkpoints/Eval-CLS/dtd_abase_pretrain_eval \
     --config Comparative-R1/configs/dtd_config.yaml \
+    --mode passthrough \
+    --prompt-key prompt \
+    --answer-key answer \
+    --image-key images \
+    --image-dir /mnt/cache/wuruixiao/users/lsc/data/dtd/images/ \
+    --reward-function Comparative-R1/reward/dtd_direct_mixed_reward.py:compute_score \
+    --format-prompt null \
+    --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
+# single-image eval
+python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
+        --val /mnt/cache/wuruixiao/users/lsc/data/datasets_b2n/DescribableTextures_b2n_base_test.jsonl \
+    --out ./checkpoints/Eval-CLS/dtd_abase_pretrain_eval \
+    --config Comparative-R1/configs/dtd_config.yaml \
+    --mode passthrough \
+    --prompt-key problem \
+    --answer-key label \
+    --image-key image \
+    --image-dir /mnt/cache/wuruixiao/users/lsc/data/dtd/images/ \
+    --reward-function Comparative-R1/reward/dtd_direct_mixed_reward.py:compute_score \
+    --format-prompt /mnt/cache/wuruixiao/users/lsc/EasyR1/Comparative-R1/prompts/dtd_nothinking.jinja \
+    --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
+# RFT models
+python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
     --mode passthrough \
     --prompt-key problem \
     --answer-key label \
@@ -53,14 +81,17 @@ python3 EasyR1/Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.p
 python3 ./Comparative-R1/scripts/eval/eval_optionless_checkpoint_and_dump.py \
     --config Comparative-R1/configs/dtd_config.yaml \
     --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/CLS-RL/comparative_r1/qwen2_5_7b_dtd_b2n_gspo_thinking/global_step_155 \
+    --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/CLS-RL/comparative_r1/qwen2_5_7b_dtd_b2n_gspo_thinking/global_step_155 \
     --mode passthrough \
     --prompt-key prompt \
     --answer-key answer \
     --image-key images \
     --image-dir /mnt/cache/wuruixiao/users/lsc/data/dtd/images/ \
+    --image-dir /mnt/cache/wuruixiao/users/lsc/data/dtd/images/ \
     --reward-function Comparative-R1/reward/dtd_direct_mixed_reward.py:compute_score \
     --format-prompt null \
     --override worker.actor.model.model_path=/mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b
+
 
 Notes:
 - This is meant for *single-image* disease diagnosis style tasks (task_type=mcq_letter).
@@ -186,6 +217,7 @@ def run_val_only(
     answer_key: str,
     image_key: str,
     image_dir: Optional[str],
+    image_dir: Optional[str],
     format_prompt: Optional[str],
     extra_overrides: list[str],
 ) -> None:
@@ -209,6 +241,7 @@ def run_val_only(
         f"trainer.experiment_name={experiment_name}",
         "trainer.find_last_checkpoint=false",
         f"worker.reward.reward_function={reward_function}",
+        f"data.image_dir={image_dir}"
         f"data.image_dir={image_dir}"
     ]
     if format_prompt is None:
@@ -385,6 +418,7 @@ def main() -> None:
     ap.add_argument("--name", type=str, default=None)
     ap.add_argument("--analyze-only", action="store_true", help="Skip running veRL; only parse existing generations.log.")
     ap.add_argument("--keep-transformed", action="store_true", help="Keep the transformed val jsonl under <out>/_transformed/.")
+    ap.add_argument("--keep-transformed", action="store_true", help="Keep the transformed val jsonl under <out>/_transformed/.")
     ap.add_argument(
         "--mode",
         choices=["optionless", "passthrough"],
@@ -394,6 +428,8 @@ def main() -> None:
     ap.add_argument("--prompt-key", type=str, default="prompt", help="data.prompt_key override for veRL")
     ap.add_argument("--answer-key", type=str, default="answer", help="data.answer_key override for veRL")
     ap.add_argument("--image-key", type=str, default="images", help="data.image_key override for veRL")
+    ap.add_argument("--image-dir", type=str, default="")
+    
     ap.add_argument("--image-dir", type=str, default="")
     
     ap.add_argument(
@@ -432,6 +468,10 @@ def main() -> None:
         transformed_dir = out_dir / "_transformed"
         transformed_dir.mkdir(parents=True, exist_ok=True)
         transformed_val = transformed_dir / f"{val_jsonl.stem}.optionless.jsonl"
+        # Use a dedicated subdir to avoid clobbering user datasets when `--out` points to a data directory.
+        transformed_dir = out_dir / "_transformed"
+        transformed_dir.mkdir(parents=True, exist_ok=True)
+        transformed_val = transformed_dir / f"{val_jsonl.stem}.optionless.jsonl"
         _write_jsonl(transformed_val, out_rows)
         (out_dir / f"{val_jsonl.stem}.optionless.summary.json").write_text(
             json.dumps({"input": str(val_jsonl), "output": str(transformed_val), "info": info}, ensure_ascii=False, indent=2),
@@ -455,6 +495,7 @@ def main() -> None:
             prompt_key=args.prompt_key,
             answer_key=args.answer_key,
             image_key=args.image_key,
+            image_dir=args.image_dir,
             image_dir=args.image_dir,
             format_prompt=args.format_prompt,
             extra_overrides=args.override,
@@ -496,12 +537,20 @@ def main() -> None:
     stats_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if (not args.keep_transformed) and args.mode == "optionless":
+    if (not args.keep_transformed) and args.mode == "optionless":
         # Keep the summary, but remove the big transformed file by default.
+        # IMPORTANT: never delete the user-provided `--val` file.
         # IMPORTANT: never delete the user-provided `--val` file.
         try:
             if transformed_val.resolve() == val_jsonl.resolve():
                 raise RuntimeError(f"Refusing to delete --val file: {transformed_val}")
+            if transformed_val.resolve() == val_jsonl.resolve():
+                raise RuntimeError(f"Refusing to delete --val file: {transformed_val}")
             transformed_val.unlink()
+        except Exception:
+            pass
+        try:
+            transformed_dir.rmdir()  # type: ignore[name-defined]
         except Exception:
             pass
         try:

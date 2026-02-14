@@ -1,11 +1,10 @@
 data:
   # Mixed offline_rft JSONL (cls + attr + text_rule) produced by your mixing script.
   # Override via CLI: data.train_files=/path/to/train_mix.jsonl
-  train_files: /data/shichao/EasyR1/data/offline_rft/isic/v1/train_mix.jsonl
-
+  train_files: /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/4shot_nothinking.jsonl
   # Validation is typically cls-only (open-text label) to match your main metric.
   # Override via CLI: data.val_files=/path/to/val_cls.jsonl
-  val_files: /data/shichao/EasyR1/data/offline_rft/isic/v1/val_cls.jsonl
+  val_files: /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/test_4shot_nothinking.jsonl
 
   # offline_rft schema
   prompt_key: prompt
@@ -15,8 +14,7 @@ data:
 
   # Root that contains the "Images/..." directory referenced by JSONL.
   # For this machine: /data/shichao/data/OmniMedVQA
-  image_dir: /data/shichao/data/OmniMedVQA
-
+  image_dir: /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA
   video_fps: 2.0
   max_prompt_length: 8192
   max_response_length: 256
@@ -27,7 +25,8 @@ data:
   # Optional prompt wrapper:
   # - does NOT inject "<image>" for text-only rows (e.g., text_rule)
   # - adds missing cls output-format reminders only when absent in the raw prompt
-  format_prompt: ./Comparative-R1/prompts/remap_isic.jinja
+  # format_prompt: ./Comparative-R1/prompts/remap_isic.jinja
+  format_prompt: null
   override_chat_template: null
 
   shuffle: true
@@ -112,7 +111,7 @@ worker:
     tensor_parallel_size: 1
     disable_tqdm: false
     val_override_config:
-      temperature: 0.6
+      temperature: 0.7
       top_p: 0.95
       n: 1
     max_num_batched_tokens: 9216
@@ -133,14 +132,14 @@ worker:
 trainer:
   total_epochs: 200
   max_steps: null
-  project_name: CLS-RL
-  experiment_name: isic_offline_rft_remap_mixed
+  project_name: ReMAP
+  experiment_name: remap_curriculum_isic_v0.6
   logger: ["file", "swanlab"]
   nnodes: 1
   n_gpus_per_node: 4
   max_try_make_batch: 20
   val_freq: 5
-  val_before_train: true
+  val_before_train: false
   val_only: false
   val_generations_to_log: 6
   save_freq: 5
@@ -149,3 +148,4 @@ trainer:
   save_checkpoint_path: null
   load_checkpoint_path: null
   find_last_checkpoint: true
+  resume_dataloader_state: false

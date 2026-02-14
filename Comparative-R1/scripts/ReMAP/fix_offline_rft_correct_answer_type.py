@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Tuple
 
@@ -18,8 +20,8 @@ This script normalizes `answer.correct_answer` to ALWAYS be a string:
 
 Usage:
   python3 Comparative-R1/scripts/ReMAP/fix_offline_rft_correct_answer_type.py \
-    --input  data/offline_rft/isic/v1/train_text_rule.jsonl \
-    --output data/offline_rft/isic/v1/train_text_rule.fixed.jsonl
+    --input  /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/train_mix_all.jsonl \
+    --output /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/train_mix_all.jsonl
 """
 
 
@@ -77,9 +79,30 @@ def main() -> None:
     none_to_empty = 0
 
     out_fh = None
+    tmp_out_path: Path | None = None
+    write_path: Path | None = None
     if not args.dry_run:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_fh = out_path.open("w", encoding="utf-8")
+        # In-place rewrites are dangerous if we open the output file before reading input.
+        # If output == input, write to a temp file and atomically replace at the end.
+        try:
+            same_output_as_input = out_path.resolve() == in_path.resolve()
+        except FileNotFoundError:
+            same_output_as_input = False
+
+        if same_output_as_input:
+            fd, tmp_name = tempfile.mkstemp(
+                prefix=out_path.name + ".",
+                suffix=".tmp",
+                dir=str(out_path.parent),
+            )
+            os.close(fd)
+            tmp_out_path = Path(tmp_name)
+            write_path = tmp_out_path
+        else:
+            write_path = out_path
+
+        out_fh = write_path.open("w", encoding="utf-8")
     try:
         for line_no, s in _read_nonempty_lines(in_path):
             total += 1
@@ -121,6 +144,15 @@ def main() -> None:
     finally:
         if out_fh is not None:
             out_fh.close()
+        if tmp_out_path is not None:
+            try:
+                os.replace(tmp_out_path, out_path)
+            except Exception:
+                try:
+                    tmp_out_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                raise
 
     summary = {
         "input": str(in_path),

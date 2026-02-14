@@ -663,6 +663,105 @@ class RayPPOTrainer:
         samples = samples[: self.config.trainer.val_generations_to_log]
         self.logger.log_generation(samples, self.global_step)
 
+    def _init_train_rollout_log_file(self) -> None:
+        self._train_rollout_log_path = os.path.join(self.config.trainer.save_checkpoint_path, "train_generations.log")
+        os.makedirs(self.config.trainer.save_checkpoint_path, exist_ok=True)
+        if not os.path.exists(self._train_rollout_log_path):
+            with open(self._train_rollout_log_path, "w", encoding="utf-8"):
+                pass
+
+    def _maybe_log_train_rollout_groups(
+        self,
+        batch: DataProto,
+        reward_tensor: torch.Tensor,
+        reward_metrics: dict[str, list[float]],
+    ) -> dict[str, float]:
+        max_groups = int(getattr(self.config.trainer, "train_rollout_groups_to_log", 0))
+        if max_groups <= 0:
+            return {}
+
+        correct_values: list[float] | None = None
+        for key in ("acc", "accuracy", "correct", "is_correct"):
+            values = _to_float_list(reward_metrics.get(key))
+            if values is not None:
+                correct_values = values
+                break
+        if correct_values is None:
+            return {}
+
+        try:
+            uid_list = list(batch.non_tensor_batch["uid"].tolist())
+        except Exception:
+            uid_list = list(batch.non_tensor_batch["uid"])
+        if len(uid_list) != len(correct_values):
+            return {}
+
+        uid2idx: dict[str, list[int]] = defaultdict(list)
+        for i, uid in enumerate(uid_list):
+            uid2idx[str(uid)].append(i)
+
+        only_all_wrong = bool(getattr(self.config.trainer, "train_rollout_log_only_all_wrong", True))
+        selected_uids: list[str] = []
+        all_wrong_groups = 0
+        for uid, idxs in uid2idx.items():
+            is_all_wrong = all(float(correct_values[i]) < 0.5 for i in idxs)
+            if is_all_wrong:
+                all_wrong_groups += 1
+            if only_all_wrong and (not is_all_wrong):
+                continue
+            selected_uids.append(uid)
+            if len(selected_uids) >= max_groups:
+                break
+
+        if not selected_uids:
+            return {
+                "train_rollout/all_wrong_groups": float(all_wrong_groups),
+                "train_rollout/total_groups": float(len(uid2idx)),
+                "train_rollout/logged_groups": 0.0,
+            }
+
+        prompt_ids = batch.batch["prompts"]
+        response_ids = batch.batch["responses"]
+        gt_list = list(batch.non_tensor_batch["ground_truth"])
+        reward_scores = reward_tensor.sum(-1).detach().cpu().tolist()
+
+        with open(self._train_rollout_log_path, "a", encoding="utf-8") as f:
+            f.write(
+                f"[step] {self.global_step} "
+                f"[logged_groups] {len(selected_uids)} "
+                f"[all_wrong_groups] {all_wrong_groups} "
+                f"[total_groups] {len(uid2idx)}\n"
+            )
+            for uid in selected_uids:
+                idxs = uid2idx[uid]
+                ratio = float(np.mean([correct_values[i] for i in idxs])) if idxs else 0.0
+                f.write(f"[train][uid] {uid} [group_correct_ratio] {ratio:.4f} [group_size] {len(idxs)}\n")
+                for rollout_idx, i in enumerate(idxs):
+                    prompt_text = self.tokenizer.decode(prompt_ids[i], skip_special_tokens=True)
+                    response_text = self.tokenizer.decode(response_ids[i], skip_special_tokens=True)
+                    gt = gt_list[i]
+                    if isinstance(gt, dict):
+                        gt_text = json.dumps(gt, ensure_ascii=False)
+                    else:
+                        gt_text = str(gt)
+                    score = float(reward_scores[i])
+                    corr = float(correct_values[i])
+                    f.write(
+                        f"[rollout_idx] {rollout_idx}\n"
+                        f"[prompt] {prompt_text}\n"
+                        f"[output] {response_text}\n"
+                        f"[ground_truth] {gt_text}\n"
+                        f"[score] {score}\n"
+                        f"[is_correct] {corr}\n\n"
+                    )
+            f.write("\n")
+
+        return {
+            "train_rollout/all_wrong_groups": float(all_wrong_groups),
+            "train_rollout/total_groups": float(len(uid2idx)),
+            "train_rollout/logged_groups": float(len(selected_uids)),
+        }
+
     def _validate(self) -> dict[str, Any]:
         reward_tensor_lst = []
         # Lists to collect samples for the table
@@ -839,6 +938,7 @@ class RayPPOTrainer:
         The light-weight advantage computation is done on the driver process.
         """
         self.logger = Tracker(loggers=self.config.trainer.logger, config=self.config.to_dict())
+        self._init_train_rollout_log_file()
         self.global_step = 0
         main_tqdm = tqdm(range(self.training_steps), desc="Running step", position=0)
         val_metrics: Optional[dict[str, Any]] = None
@@ -902,6 +1002,13 @@ class RayPPOTrainer:
                         # get token level scores asynchronously
                         reward_tensor, reward_metrics = ray.get(reward_ref)
                         batch.batch["token_level_scores"] = reward_tensor
+                        metrics.update(
+                            self._maybe_log_train_rollout_groups(
+                                batch=batch,
+                                reward_tensor=reward_tensor,
+                                reward_metrics=reward_metrics,
+                            )
+                        )
                         metrics.update(
                             compute_rollout_correct_ratio_metrics(
                                 uids=batch.non_tensor_batch["uid"],

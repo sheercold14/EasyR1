@@ -148,6 +148,10 @@ class TrainerConfig:
     """validate only, skip training"""
     val_generations_to_log: int = 0
     """number of generations to log for validation"""
+    train_rollout_groups_to_log: int = 0
+    """number of training rollout groups (by uid) to append to train_generations.log each step"""
+    train_rollout_log_only_all_wrong: bool = True
+    """if true, only log groups where all rollouts are wrong"""
     save_freq: int = -1
     """save frequency, -1 means no saving"""
     save_limit: int = -1

@@ -126,8 +126,6 @@ worker:
 
   reward:
     reward_function: Comparative-R1/reward/ReMAP/offline_rft_mixed_reward_v1.py:compute_score
-    reward_function_kwargs:
-      list_score_mode: f1
 
 trainer:
   total_epochs: 200
@@ -138,7 +136,7 @@ trainer:
   nnodes: 1
   n_gpus_per_node: 4
   max_try_make_batch: 20
-  val_freq: 5
+  val_freq: 10
   val_before_train: false
   val_only: false
   val_generations_to_log: 6
@@ -148,6 +146,4 @@ trainer:
   save_checkpoint_path: null
   load_checkpoint_path: null
   find_last_checkpoint: true
-  resume_dataloader_state: false
-  train_rollout_groups_to_log: 20
-  train_rollout_log_only_all_wrong: true
+  resume_dataloader_state: true

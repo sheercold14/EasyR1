@@ -126,13 +126,13 @@ worker:
 
   reward:
     reward_function: Comparative-R1/reward/ReMAP/offline_rft_mixed_reward_v1.py:compute_score
-    reward_function_kwargs:
-      list_score_mode: f1
+    # reward_function_kwargs:
+    #   list_score_mode: f1
 
 trainer:
   total_epochs: 200
   max_steps: null
-  project_name: ReMAP
+  project_name: MCQ_failure
   experiment_name: remap_curriculum_isic_v0.6
   logger: ["file", "swanlab"]
   nnodes: 1

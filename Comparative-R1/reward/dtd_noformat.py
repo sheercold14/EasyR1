@@ -27,7 +27,14 @@ def compute_score(reward_inputs: List[dict[str, Any]]) -> List[dict[str, float]]
     for item in reward_inputs:
         resp = item["response"]
         gt = item["ground_truth"]
-        gt_text = gt.get("label", "") if isinstance(gt, dict) else str(gt)
+        if isinstance(gt, dict):
+            label = gt.get("label", "")
+            if label is None or (isinstance(label, str) and label.strip() == ""):
+                gt_text = str(gt.get("correct_answer", ""))
+            else:
+                gt_text = str(label)
+        else:
+            gt_text = str(gt)
 
         pred = _normalize(_extract_answer(resp))
         gold = _normalize(gt_text)
@@ -41,4 +48,3 @@ def compute_score(reward_inputs: List[dict[str, Any]]) -> List[dict[str, float]]
             }
         )
     return scores
-

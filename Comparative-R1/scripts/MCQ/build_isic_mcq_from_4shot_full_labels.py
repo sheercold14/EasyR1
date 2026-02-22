@@ -6,10 +6,10 @@ Different from build_isic_mcq_from_4shot.py:
 - options are built from full input candidate labels (answer.candidate_labels)
 - output answer metadata keeps the full label list
 
-python /data/shichao/EasyR1/Comparative-R1/scripts/MCQ/build_isic_mcq_from_4shot_full_labels.py \
-    --input /data/shichao/EasyR1/data/offline_rft/isic/v1/test_4shot_nothinking.jsonl \
-    --qa-open-access-dir /data/shichao/data/OmniMedVQA/QA_information/Open-access \
-    --output /data/shichao/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels.jsonl \
+python EasyR1/Comparative-R1/scripts/MCQ/build_isic_mcq_from_4shot_full_labels.py \
+    --input EasyR1/data/offline_rft/isic/v1/4shot_nothinking.jsonl \
+    --qa-open-access-dir /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA/QA_information/Open-access \
+    --output EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels.jsonl \
     --strict
 """
 

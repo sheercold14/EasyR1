@@ -68,10 +68,10 @@ algorithm:
 
 worker:
   actor:
-    loss_type: gspo_token
-    loss_avg_mode: seq
-    clip_ratio_low: 3e-4
-    clip_ratio_high: 4e-4
+    # loss_type: gspo_token
+    # loss_avg_mode: seq
+    # clip_ratio_low: 3e-4
+    # clip_ratio_high: 4e-4
     global_batch_size: 32
     micro_batch_size_per_device_for_update: 1
     micro_batch_size_per_device_for_experience: 2
@@ -105,7 +105,7 @@ worker:
     top_p: 0.9
     # Our tasks are single-image or text-only; keep it tight for memory.
     limit_images: 1
-    gpu_memory_utilization: 0.7
+    gpu_memory_utilization: 0.6
     enforce_eager: false
     enable_chunked_prefill: false
     tensor_parallel_size: 1
@@ -130,7 +130,7 @@ worker:
 trainer:
   total_epochs: 200
   max_steps: null
-  project_name: ReMAP
+  project_name: MCQ_failure
   experiment_name: remap_curriculum_isic_v0.6
   logger: ["file", "swanlab"]
   nnodes: 1

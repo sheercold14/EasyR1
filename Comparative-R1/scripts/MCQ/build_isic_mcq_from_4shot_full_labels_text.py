@@ -13,9 +13,9 @@ python /data/shichao/EasyR1/Comparative-R1/scripts/MCQ/build_isic_mcq_from_4shot
     --strict
     
   python /data/shichao/EasyR1/Comparative-R1/scripts/MCQ/build_isic_mcq_from_4shot_full_labels_text.py \
-    --input /data/shichao/EasyR1/data/offline_rft/isic/v1/test_4shot_nothinking.jsonl \
+    --input /data/shichao/EasyR1/data/offline_rft/isic/v1/4shot_nothinking.jsonl \
     --qa-open-access-dir /data/shichao/data/OmniMedVQA/QA_information/Open-access \
-    --output /data/shichao/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels_text.jsonl \
+    --output /data/shichao/EasyR1/data/offline_rft/isic/v1/MCQ_4shot_nothinking.full_labels_text.jsonl \
     --strict
 """
 
@@ -52,9 +52,11 @@ def _dedup_labels(labels: list[Any]) -> list[str]:
     return out
 
 
-def _build_prompt(question: str) -> str:
+def _build_prompt(question: str, candidate_labels: list[str]) -> str:
+    label_block = ", ".join(str(x).strip() for x in candidate_labels if str(x).strip())
     return (
         f"Question: {str(question).strip()}\n"
+        f"Please choose one from list [{label_block}].\n"
         "Answer with only the diagnosis text.\n"
         "<answer></answer>"
     )
@@ -205,6 +207,7 @@ def convert(
         answer_payload = {
             "label": label_text,
             "candidate_labels": candidate_labels,
+            "candidate_list": candidate_labels,
             "question_id": picked.get("question_id"),
             "dataset": dataset,
             "question_type": picked.get("question_type"),
@@ -217,7 +220,7 @@ def convert(
 
         out.append(
             {
-                "prompt": _build_prompt(str(picked.get("question", "")).strip()),
+                "prompt": _build_prompt(str(picked.get("question", "")).strip(), candidate_labels),
                 "images": [image_path],
                 "answer": answer_payload,
             }
@@ -266,4 +269,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

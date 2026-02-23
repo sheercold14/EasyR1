@@ -59,11 +59,11 @@ Typical use:
 ```bash
 # Multi-tap in one run (shared forward for all hs:* taps)
 python3 -m probe_analysis.extract_features_from_checkpoint \
-  --data /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels_text.jsonl \
+  --data /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.4labels_text.jsonl \
   --sample-id-key images.0 \
   --image-root /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA \
-  --checkpoint /mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b \
-  --output-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_pre_multitap.npz \
+  --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/MCQ_failure/4label_text_list_eval2_nothinking_isic_rollout_log/global_step_170/actor/huggingface \
+  --output-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_4labellist_post_multitap.npz \
   --taps vision_mean \
   --taps hs:0:image \
   --taps hs:16:image \
@@ -71,7 +71,8 @@ python3 -m probe_analysis.extract_features_from_checkpoint \
   --taps last:-1 \
   --prompt-key prompt \
   --dtype bf16 --device auto --trust-remote-code \
-  --verbose --progress-every 50
+  --verbose \
+  --progress-every 50 
 
 # Tap B: embedding output (layer=0), pool image-token hidden states
 python3 -m probe_analysis.extract_features_from_checkpoint \
@@ -145,7 +146,7 @@ python3 -m probe_analysis.run_probe \
   --output-dir /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/probe_grouped \
   --extractor npz \
   --features-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_multitap.npz \
-  --features-key features_hs-1_image \
+  --features-key features_hs0_image \
   --ids-key image_paths \
   --label-key answer.label \
   --probes linear,knn,mlp \
@@ -153,7 +154,10 @@ python3 -m probe_analysis.run_probe \
   --candidate-labels-key answer.candidate_labels \
   --test-size 0.4 \
   --min-group-size 20 \
-  --bootstrap 1000
+  --verbose \
+  --log-every 50 \
+  --bootstrap 1000 \
+  --auto-summary-suffix
 ```
 
 ## Step 3: Compare pre vs post

@@ -9,7 +9,22 @@ import time
 from pathlib import Path
 
 import numpy as np
+"""
+  python3 -m probe_analysis.run_all_feature_keys_prepost \
+    --data /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels_text.jsonl \
+    --output-dir /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/4label_list_all_taps \
+    --pre-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_4labellist_pre_multitap.npz \
+    --post-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_4labellist_post_multitap.npz \
+    --probe-label-key answer.label \
+    --probe-sample-id-key images.0 \
+    --ids-key image_paths \
+    --group-by-candidate-labels \
+    --candidate-labels-key answer.candidate_labels \
+    --min-group-size 20 \
+    --verbose
 
+
+"""
 
 def _safe_name(s: str) -> str:
     return "".join(ch if (ch.isalnum() or ch in "._-") else "_" for ch in s)

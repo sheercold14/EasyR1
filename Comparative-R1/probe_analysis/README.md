@@ -98,6 +98,10 @@ python3 probe_analysis/run_probe.py \
   --probes linear,knn,mlp
 ```
 
+```bash
+  python3 -m probe_analysis.run_probe --data /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels_text.jsonl --output-dir /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/probe --extractor npz --features-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_pre_features.npz --probes linear,knn,mlp --group-by-candidate-labels --candidate-labels-key answer.candidate_labels --min-group-size 20 --ids-key image_paths --sample-id-key images.0 
+```
+
 Repeat with pre-RFT checkpoint and compare:
 
 ```bash

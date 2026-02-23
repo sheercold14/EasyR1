@@ -4,8 +4,12 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
+
+if __package__ is None or __package__ == "":
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from probe_analysis.datasets import load_jsonl
 from probe_analysis.hf_extractors import build_qwen2vl_visual_mean_extractor

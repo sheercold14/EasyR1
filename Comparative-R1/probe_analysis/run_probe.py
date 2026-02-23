@@ -41,6 +41,13 @@ def parse_args() -> argparse.Namespace:
 
     p.add_argument("--bootstrap", type=int, default=1000, help="bootstrap rounds for 95% CI")
     p.add_argument("--save-features", action="store_true")
+    p.add_argument(
+        "--group-by-candidate-labels",
+        action="store_true",
+        help="Run probes separately for each candidate label schema (from --candidate-labels-key).",
+    )
+    p.add_argument("--candidate-labels-key", type=str, default="answer.candidate_labels")
+    p.add_argument("--min-group-size", type=int, default=20)
     return p.parse_args()
 
 
@@ -70,6 +77,65 @@ def split_samples(samples: list[Sample], y: np.ndarray, test_size: float, seed: 
         train_idx.extend(idxs[n_test:])
 
     return np.asarray(sorted(train_idx), dtype=np.int64), np.asarray(sorted(test_idx), dtype=np.int64)
+
+
+def candidate_schema(row: dict, candidate_labels_key: str) -> str:
+    from probe_analysis.utils import deep_get
+
+    vals = deep_get(row, candidate_labels_key, None)
+    if not isinstance(vals, list):
+        return "__missing__"
+    labels = [str(x).strip() for x in vals if str(x).strip()]
+    if not labels:
+        return "__empty__"
+    return " | ".join(labels)
+
+
+def run_single_eval(
+    *,
+    x_all: np.ndarray,
+    y_all: np.ndarray,
+    classes: np.ndarray,
+    args: argparse.Namespace,
+) -> dict:
+    train_idx, test_idx = split_samples([], y_all, args.test_size, args.seed)
+    x_train, y_train = x_all[train_idx], y_all[train_idx]
+    x_test, y_test = x_all[test_idx], y_all[test_idx]
+
+    probe_names = {x.strip() for x in args.probes.split(",") if x.strip()}
+    outputs = []
+    if "linear" in probe_names:
+        outputs.append(run_linear_probe(x_train, y_train, x_test, seed=args.seed))
+    if "knn" in probe_names:
+        outputs.append(run_knn_probe(x_train, y_train, x_test, k=args.knn_k))
+    if "mlp" in probe_names:
+        outputs.append(run_mlp_probe(x_train, y_train, x_test, seed=args.seed, hidden_dim=args.mlp_hidden))
+    if not outputs:
+        raise ValueError("No valid probes selected")
+
+    results = []
+    for out in outputs:
+        m = compute_metrics(y_test, out.y_pred)
+        ci = bootstrap_ci(y_test, out.y_pred, n_bootstrap=args.bootstrap, seed=args.seed)
+        results.append(
+            {
+                "probe": out.name,
+                "metrics": m,
+                "bootstrap_ci": ci,
+            }
+        )
+
+    return {
+        "n_classes": int(len(classes)),
+        "classes": classes.tolist(),
+        "split": {
+            "train_size": int(len(train_idx)),
+            "test_size": int(len(test_idx)),
+            "test_ratio": args.test_size,
+            "seed": args.seed,
+        },
+        "results": results,
+    }
 
 
 def main() -> None:
@@ -105,48 +171,41 @@ def main() -> None:
     if x_all.shape[0] != len(samples):
         raise ValueError(f"Feature/sample size mismatch: features={x_all.shape[0]} samples={len(samples)}")
 
-    train_idx, test_idx = split_samples(samples, y_all, args.test_size, args.seed)
-    x_train, y_train = x_all[train_idx], y_all[train_idx]
-    x_test, y_test = x_all[test_idx], y_all[test_idx]
-
-    probe_names = {x.strip() for x in args.probes.split(",") if x.strip()}
-    outputs = []
-    if "linear" in probe_names:
-        outputs.append(run_linear_probe(x_train, y_train, x_test, seed=args.seed))
-    if "knn" in probe_names:
-        outputs.append(run_knn_probe(x_train, y_train, x_test, k=args.knn_k))
-    if "mlp" in probe_names:
-        outputs.append(run_mlp_probe(x_train, y_train, x_test, seed=args.seed, hidden_dim=args.mlp_hidden))
-    if not outputs:
-        raise ValueError("No valid probes selected")
-
-    results = []
-    for out in outputs:
-        m = compute_metrics(y_test, out.y_pred)
-        ci = bootstrap_ci(y_test, out.y_pred, n_bootstrap=args.bootstrap, seed=args.seed)
-        results.append(
-            {
-                "probe": out.name,
-                "metrics": m,
-                "bootstrap_ci": ci,
-            }
-        )
-
     summary = {
         "data": args.data,
         "n_samples": len(samples),
-        "n_classes": int(len(classes)),
-        "classes": classes.tolist(),
         "feature_shape": list(x_all.shape),
         "extractor": args.extractor,
-        "split": {
-            "train_size": int(len(train_idx)),
-            "test_size": int(len(test_idx)),
-            "test_ratio": args.test_size,
-            "seed": args.seed,
-        },
-        "results": results,
+        "group_by_candidate_labels": bool(args.group_by_candidate_labels),
     }
+
+    if not args.group_by_candidate_labels:
+        summary.update(run_single_eval(x_all=x_all, y_all=y_all, classes=classes, args=args))
+    else:
+        schemas = [candidate_schema(s.raw, args.candidate_labels_key) for s in samples]
+        group_to_idx: dict[str, list[int]] = {}
+        for i, g in enumerate(schemas):
+            group_to_idx.setdefault(g, []).append(i)
+
+        group_summaries = []
+        skipped = []
+        for g, idxs in sorted(group_to_idx.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+            if len(idxs) < args.min_group_size:
+                skipped.append({"group": g, "size": len(idxs), "reason": "below_min_group_size"})
+                continue
+            sub_labels = labels[idxs]
+            sub_y, sub_classes = encode_labels(sub_labels)
+            if len(sub_classes) < 2:
+                skipped.append({"group": g, "size": len(idxs), "reason": "single_class"})
+                continue
+            sub_x = x_all[idxs]
+            res = run_single_eval(x_all=sub_x, y_all=sub_y, classes=sub_classes, args=args)
+            res["group"] = g
+            res["n_samples"] = len(idxs)
+            group_summaries.append(res)
+
+        summary["groups"] = group_summaries
+        summary["group_skipped"] = skipped
 
     (out_dir / "summary.json").write_text(json.dumps(json_ready(summary), ensure_ascii=False, indent=2), encoding="utf-8")
 

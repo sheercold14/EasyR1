@@ -9,6 +9,7 @@ from PIL import Image
 from transformers import AutoModelForImageTextToText, AutoProcessor
 
 from probe_analysis.datasets import Sample
+from probe_analysis.utils import deep_get
 
 
 def _to_torch_dtype(name: str) -> torch.dtype:
@@ -312,6 +313,9 @@ class Qwen2VLMultiTapExtractor:
         return self.image_root / p
 
     def _build_inputs(self, image_path: str) -> dict[str, torch.Tensor]:
+        return self._build_inputs_with_prompt(image_path=image_path, prompt_text=self.prompt_text)
+
+    def _build_inputs_with_prompt(self, *, image_path: str, prompt_text: str) -> dict[str, torch.Tensor]:
         p = self._resolve(image_path)
         with Image.open(p) as img:
             image = img.convert("RGB")
@@ -321,7 +325,7 @@ class Qwen2VLMultiTapExtractor:
                 "role": "user",
                 "content": [
                     {"type": "image"},
-                    {"type": "text", "text": self.prompt_text},
+                    {"type": "text", "text": prompt_text},
                 ],
             }
         ]
@@ -374,15 +378,27 @@ class Qwen2VLMultiTapExtractor:
         tap_specs: list[str],
         progress_every: int = 50,
         verbose: bool = False,
+        prompt_key: str = "",
+        prompt_fallback: str = "",
     ) -> dict[str, np.ndarray]:
         parsed = [self._parse_tap(s) for s in tap_specs]
+        names = [n for n, _ in parsed]
+        if len(set(names)) != len(names):
+            raise ValueError(f"Duplicate tap names after parsing: {names}")
         want_vision = any(name == "vision_mean" for name, _ in parsed)
         want_hs = any((name.startswith("hs") or name.startswith("last")) for name, _ in parsed)
 
         feats: dict[str, list[np.ndarray]] = {name: [] for name, _ in parsed}
 
         for i, s in enumerate(samples, 1):
-            inputs = self._build_inputs(s.image_path)
+            if prompt_key:
+                ptxt = deep_get(s.raw, prompt_key, "")
+                ptxt = str(ptxt).strip() if ptxt is not None else ""
+                if not ptxt:
+                    ptxt = prompt_fallback or self.prompt_text
+                inputs = self._build_inputs_with_prompt(image_path=s.image_path, prompt_text=ptxt)
+            else:
+                inputs = self._build_inputs(s.image_path)
             input_ids = inputs.get("input_ids", None)
             if input_ids is None:
                 raise ValueError("Processor did not return input_ids")
@@ -391,12 +407,17 @@ class Qwen2VLMultiTapExtractor:
                 last_pos = int(attn[0].sum().item()) - 1
             else:
                 last_pos = int(input_ids.shape[1]) - 1
+            if last_pos < 0:
+                raise ValueError("Invalid attention_mask: sequence has no non-pad tokens")
 
             hs = None
             if want_hs:
                 with torch.no_grad():
                     out = self.model(**inputs, output_hidden_states=True, use_cache=False, return_dict=True)
                 hs = getattr(out, "hidden_states", None)
+                if hs is None:
+                    # Some encoder-decoder style outputs expose decoder_hidden_states.
+                    hs = getattr(out, "decoder_hidden_states", None)
                 if hs is None:
                     raise ValueError("Model did not return hidden_states")
 

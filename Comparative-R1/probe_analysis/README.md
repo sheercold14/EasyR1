@@ -41,6 +41,7 @@ python3 -m probe_analysis.extract_features_from_checkpoint \
   --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/.../global_step_xxx/actor/huggingface \
   --output-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_vision_mean.npz \
   --tap vision_mean \
+  --prompt-key prompt \
   --dtype bf16 \
   --device auto \
   --trust-remote-code
@@ -68,6 +69,7 @@ python3 -m probe_analysis.extract_features_from_checkpoint \
   --taps hs:16:image \
   --taps hs:-1:image \
   --taps last:-1 \
+  --prompt-key prompt \
   --dtype bf16 --device auto --trust-remote-code \
   --verbose --progress-every 50
 

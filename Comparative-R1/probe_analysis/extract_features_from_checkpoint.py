@@ -31,6 +31,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--trust-remote-code", action="store_true")
     p.add_argument("--prompt-text", default="Describe the image briefly.")
     p.add_argument(
+        "--prompt-key",
+        default="",
+        help="Optional JSONL key for per-sample prompt text, e.g. 'prompt'. If empty, uses --prompt-text.",
+    )
+    p.add_argument(
+        "--prompt-fallback",
+        default="",
+        help="Fallback prompt when --prompt-key is set but missing/empty for a sample.",
+    )
+    p.add_argument(
         "--tap",
         default="vision_mean",
         choices=["vision_mean", "hidden_mean"],
@@ -84,6 +94,8 @@ def main() -> None:
         tap_specs=tap_specs,
         progress_every=args.progress_every,
         verbose=args.verbose,
+        prompt_key=args.prompt_key,
+        prompt_fallback=args.prompt_fallback,
     )
 
     ids = np.asarray([s.sample_id for s in samples], dtype=str)
@@ -93,7 +105,7 @@ def main() -> None:
     out = Path(args.output_npz)
     out.parent.mkdir(parents=True, exist_ok=True)
     # Keep a default `features` for compatibility with older scripts (points to the first tap).
-    first_key = sorted(feats_by_tap.keys())[0]
+    first_key = next(iter(feats_by_tap.keys()))
     pack = {
         "features": feats_by_tap[first_key],
         "ids": ids,

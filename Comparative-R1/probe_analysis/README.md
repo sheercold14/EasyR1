@@ -61,9 +61,9 @@ Typical use:
 python3 -m probe_analysis.extract_features_from_checkpoint \
   --data /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels_text.jsonl \
   --sample-id-key images.0 \
-  --image-root /data/shichao/data/OmniMedVQA \
-  --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/.../global_step_xxx/actor/huggingface \
-  --output-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_multitap.npz \
+  --image-root /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA \
+  --checkpoint /mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b \
+  --output-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_pre_multitap.npz \
   --taps vision_mean \
   --taps hs:0:image \
   --taps hs:16:image \
@@ -106,7 +106,7 @@ python3 -m probe_analysis.run_probe \
   --ids-key image_paths \
   --label-key answer.label \
   --probes linear,knn,mlp \
-  --test-size 0.2 \
+  --test-size 0.4 \
   --seed 42 \
   --bootstrap 1000
 ```
@@ -127,6 +127,7 @@ python3 -m probe_analysis.run_probe \
   --probes linear,knn,mlp \
   --group-by-candidate-labels \
   --candidate-labels-key answer.candidate_labels \
+  --test-size 0.4 \
   --min-group-size 20 \
   --bootstrap 1000
 ```

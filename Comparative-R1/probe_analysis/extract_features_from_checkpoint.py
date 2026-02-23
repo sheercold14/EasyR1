@@ -12,10 +12,7 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from probe_analysis.datasets import load_jsonl
-from probe_analysis.hf_extractors import (
-    build_qwen2vl_hidden_state_mean_extractor,
-    build_qwen2vl_visual_mean_extractor,
-)
+from probe_analysis.hf_extractors import Qwen2VLMultiTapExtractor
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,15 +34,18 @@ def parse_args() -> argparse.Namespace:
         "--tap",
         default="vision_mean",
         choices=["vision_mean", "hidden_mean"],
-        help="Where to extract features: vision_mean (visual tower) or hidden_mean (LLM hidden_states).",
+        help="(legacy) Single tap mode. Prefer --taps for multi-tap extraction.",
     )
-    p.add_argument("--layer", type=int, default=0, help="hidden_mean only: hidden_states layer index (0=embed).")
+    p.add_argument("--layer", type=int, default=0, help="(legacy) hidden_mean only: layer index (0=embed, -1=last).")
+    p.add_argument("--token-scope", default="image", choices=["image", "text", "all"], help="(legacy) hidden_mean only.")
     p.add_argument(
-        "--token-scope",
-        default="image",
-        choices=["image", "text", "all"],
-        help="hidden_mean only: which tokens to pool (image/text/all).",
+        "--taps",
+        action="append",
+        default=[],
+        help="Multi-tap extraction. Repeatable. Examples: vision_mean ; hs:0:image ; hs:16:image ; hs:-1:text",
     )
+    p.add_argument("--progress-every", type=int, default=50, help="Print progress every N samples (0 to disable).")
+    p.add_argument("--verbose", action="store_true")
     return p.parse_args()
 
 
@@ -60,28 +60,31 @@ def main() -> None:
     if not samples:
         raise SystemExit("No valid samples loaded")
 
-    extractor = build_qwen2vl_visual_mean_extractor(
-        image_root=args.image_root or None,
+    extractor = Qwen2VLMultiTapExtractor(
         checkpoint=args.checkpoint,
         processor_path=args.processor_path or None,
+        image_root=args.image_root or None,
         dtype=args.dtype,
         device=args.device,
         trust_remote_code=args.trust_remote_code,
         prompt_text=args.prompt_text,
     )
-    if args.tap == "hidden_mean":
-        extractor = build_qwen2vl_hidden_state_mean_extractor(
-            image_root=args.image_root or None,
-            checkpoint=args.checkpoint,
-            processor_path=args.processor_path or None,
-            dtype=args.dtype,
-            device=args.device,
-            trust_remote_code=args.trust_remote_code,
-            prompt_text=args.prompt_text,
-            layer=args.layer,
-            token_scope=args.token_scope,
-        )
-    feats = extractor.extract(samples)
+
+    if args.taps:
+        tap_specs = args.taps
+    else:
+        # legacy single-tap compatibility
+        if args.tap == "vision_mean":
+            tap_specs = ["vision_mean"]
+        else:
+            tap_specs = [f"hs:{args.layer}:{args.token_scope}"]
+
+    feats_by_tap = extractor.extract_taps(
+        samples,
+        tap_specs=tap_specs,
+        progress_every=args.progress_every,
+        verbose=args.verbose,
+    )
 
     ids = np.asarray([s.sample_id for s in samples], dtype=str)
     labels = np.asarray([s.label for s in samples], dtype=str)
@@ -89,18 +92,28 @@ def main() -> None:
 
     out = Path(args.output_npz)
     out.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(out, features=feats, ids=ids, labels=labels, image_paths=image_paths)
+    # Keep a default `features` for compatibility with older scripts (points to the first tap).
+    first_key = sorted(feats_by_tap.keys())[0]
+    pack = {
+        "features": feats_by_tap[first_key],
+        "ids": ids,
+        "labels": labels,
+        "image_paths": image_paths,
+        "features_key_default": np.asarray(first_key, dtype=str),
+    }
+    for k, v in feats_by_tap.items():
+        pack[f"features_{k}"] = v
+    np.savez_compressed(out, **pack)
 
     print(
         json.dumps(
             {
                 "output_npz": str(out),
                 "num_samples": int(len(samples)),
-                "feature_dim": int(feats.shape[1]),
+                "feature_dims": {k: int(v.shape[1]) for k, v in feats_by_tap.items()},
+                "features_keys": sorted(list(feats_by_tap.keys())),
+                "features_key_default": first_key,
                 "checkpoint": args.checkpoint,
-                "tap": args.tap,
-                "layer": args.layer if args.tap == "hidden_mean" else None,
-                "token_scope": args.token_scope if args.tap == "hidden_mean" else None,
             },
             ensure_ascii=False,
         )

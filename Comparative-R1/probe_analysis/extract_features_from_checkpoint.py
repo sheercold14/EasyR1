@@ -111,6 +111,8 @@ def main() -> None:
         "ids": ids,
         "labels": labels,
         "image_paths": image_paths,
+        # Metadata. Keep a legacy key name for backward compatibility, but prefer `default_features_key`.
+        "default_features_key": np.asarray(first_key, dtype=str),
         "features_key_default": np.asarray(first_key, dtype=str),
     }
     for k, v in feats_by_tap.items():

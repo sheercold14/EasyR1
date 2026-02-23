@@ -32,7 +32,18 @@ def _safe_name(s: str) -> str:
 
 def _load_feature_keys(npz_path: Path) -> list[str]:
     z = np.load(npz_path, allow_pickle=True)
-    keys = [k for k in z.files if k.startswith("features_")]
+    keys: list[str] = []
+    for k in z.files:
+        if not k.startswith("features_"):
+            continue
+        # Skip metadata keys that start with the prefix (e.g. features_key_default).
+        if k in {"features_key_default", "features_keys"}:
+            continue
+        arr = z[k]
+        # Only treat 2D numeric arrays as feature matrices.
+        if not hasattr(arr, "ndim") or int(getattr(arr, "ndim")) != 2:
+            continue
+        keys.append(k)
     keys.sort()
     return keys
 

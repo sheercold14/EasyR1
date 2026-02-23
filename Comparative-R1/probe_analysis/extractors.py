@@ -56,6 +56,10 @@ class NpzExtractor(BaseExtractor):
         self.ids = np.asarray(pack[id_key]).astype(str) if id_key in pack else None
 
     def extract(self, samples: list[Sample]) -> np.ndarray:
+        if self.features.ndim != 2:
+            raise ValueError(
+                f"Selected feature_key does not point to a 2D feature matrix: shape={getattr(self.features, 'shape', None)}"
+            )
         if self.ids is None:
             if len(samples) != len(self.features):
                 raise ValueError(

@@ -82,24 +82,19 @@ For Qwen2/2.5-VL merged actor checkpoints (`.../actor/huggingface`):
 ```bash
 cd /data/shichao/EasyR1/Comparative-R1
 
-python3 probe_analysis/extract_features_from_checkpoint.py \
-  --data /data/shichao/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels_text.jsonl \
-  --image-root /data/shichao/data/OmniMedVQA \
-  --checkpoint /path/to/global_step_xxx/actor/huggingface \
-  --output-npz /tmp/isic_post_features.npz \
-  --dtype bf16 \
-  --device auto \
-  --trust-remote-code
+python3 probe_analysis/extract_features_from_checkpoint.py   --data /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.4labels_text.jsonl   --image-root /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA   --checkpoint /mnt/cache/wuruixiao/users/lsc/EasyR1/checkpoints/MCQ_failure/4label_text_list_eval2_nothinking_isic_rollout_log/global_step_170/actor/huggingface   --output-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_features.npz   --dtype bf16   --device auto   --trust-remote-code
+
+python3 probe_analysis/extract_features_from_checkpoint.py   --data /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.4labels_text.jsonl   --image-root /mnt/cache/wuruixiao/users/lsc/data/OmniMedVQA   --checkpoint /mnt/cache/wuruixiao/users/lsc/qwen25-vl-7b  --output-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_pre_features.npz   --dtype bf16   --device auto   --trust-remote-code
 ```
 
 Then run probe from that npz:
 
 ```bash
 python3 probe_analysis/run_probe.py \
-  --data /data/shichao/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.full_labels_text.jsonl \
-  --output-dir /tmp/probe_post \
+  --data /mnt/cache/wuruixiao/users/lsc/EasyR1/data/offline_rft/isic/v1/MCQ_test_4shot_nothinking.4labels_text.jsonl \
+  --output-dir /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/probe \
   --extractor npz \
-  --features-npz /tmp/isic_post_features.npz \
+  --features-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_features.npz \
   --probes linear,knn,mlp
 ```
 

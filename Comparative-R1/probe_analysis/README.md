@@ -102,13 +102,36 @@ python3 -m probe_analysis.run_probe \
   --sample-id-key images.0 \
   --output-dir /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/probe_full_labels_text \
   --extractor npz \
-  --features-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_vision_mean.npz \
+  --features-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_multitap.npz \
+  --features-key features_vision_mean \
   --ids-key image_paths \
   --label-key answer.label \
   --probes linear,knn,mlp \
   --test-size 0.4 \
   --seed 42 \
   --bootstrap 1000
+```
+
+### Selecting a tap from a multi-tap npz
+
+If you extracted multiple taps into a single `.npz`, choose which tap to probe by `--features-key`.
+
+Examples:
+- `--features-key features_vision_mean`
+- `--features-key features_hs0_image`
+- `--features-key features_hs16_image`
+- `--features-key features_hs-1_image`
+- `--features-key features_last-1`
+
+To list keys inside an npz:
+
+```bash
+python3 - <<'PY'
+import numpy as np
+z=np.load('/mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_multitap.npz', allow_pickle=True)
+print(z.files)
+print('default:', z.get('features_key_default', None))
+PY
 ```
 
 ### Grouped probe by candidate label schema
@@ -121,7 +144,8 @@ python3 -m probe_analysis.run_probe \
   --sample-id-key images.0 \
   --output-dir /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/probe_grouped \
   --extractor npz \
-  --features-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_vision_mean.npz \
+  --features-npz /mnt/cache/wuruixiao/users/lsc/data/OminiMedExpert/probe_feat/isic_post_multitap.npz \
+  --features-key features_hs-1_image \
   --ids-key image_paths \
   --label-key answer.label \
   --probes linear,knn,mlp \

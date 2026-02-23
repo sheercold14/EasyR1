@@ -49,6 +49,9 @@ class NpzExtractor(BaseExtractor):
 
     def __init__(self, npz_path: str, feature_key: str = "features", id_key: str = "ids"):
         pack = np.load(npz_path, allow_pickle=False)
+        if feature_key not in pack:
+            keys = ", ".join(pack.files)
+            raise KeyError(f"Missing feature_key '{feature_key}' in npz. Available keys: {keys}")
         self.features = np.asarray(pack[feature_key])
         self.ids = np.asarray(pack[id_key]).astype(str) if id_key in pack else None
 

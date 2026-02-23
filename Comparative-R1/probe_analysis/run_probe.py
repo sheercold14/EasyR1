@@ -37,6 +37,11 @@ def parse_args() -> argparse.Namespace:
         help="If set, writes outputs to output_dir/<features_key>/... to avoid overwriting across taps.",
     )
     p.add_argument(
+        "--auto-summary-suffix",
+        action="store_true",
+        help="If set, appends features_npz stem + features_key to summary filename to avoid overwrites.",
+    )
+    p.add_argument(
         "--summary-filename",
         type=str,
         default="summary.json",
@@ -276,7 +281,17 @@ def main() -> None:
         if args.verbose and skipped:
             print(f"[group] skipped={len(skipped)} (see summary.json for details)")
 
-    summary_path = out_dir / args.summary_filename
+    summary_name = args.summary_filename
+    if args.auto_summary_suffix and args.extractor == "npz":
+        npz_stem = Path(args.features_npz).stem if args.features_npz else "npz"
+        safe_npz = "".join(ch if (ch.isalnum() or ch in "._-") else "_" for ch in str(npz_stem))
+        safe_feat = "".join(ch if (ch.isalnum() or ch in "._-") else "_" for ch in str(args.features_key))
+        suffix = f".{safe_npz}.{safe_feat}"
+        if summary_name.endswith(".json"):
+            summary_name = summary_name[: -len(".json")] + suffix + ".json"
+        else:
+            summary_name = summary_name + suffix
+    summary_path = out_dir / summary_name
     summary_path.write_text(json.dumps(json_ready(summary), ensure_ascii=False, indent=2), encoding="utf-8")
 
     if args.save_features:

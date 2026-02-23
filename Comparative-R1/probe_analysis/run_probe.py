@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import time
 
 import numpy as np
 
@@ -30,6 +31,17 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--features-npz", type=str, default="")
     p.add_argument("--features-key", type=str, default="features")
     p.add_argument("--ids-key", type=str, default="ids")
+    p.add_argument(
+        "--auto-subdir-by-features-key",
+        action="store_true",
+        help="If set, writes outputs to output_dir/<features_key>/... to avoid overwriting across taps.",
+    )
+    p.add_argument(
+        "--summary-filename",
+        type=str,
+        default="summary.json",
+        help="Output summary filename within output-dir (or subdir).",
+    )
     p.add_argument("--plugin-kwargs", type=str, default="{}", help="JSON string for custom extractor kwargs")
 
     p.add_argument("--test-size", type=float, default=0.2)
@@ -167,8 +179,13 @@ def run_single_eval(
 def main() -> None:
     args = parse_args()
     out_dir = Path(args.output_dir)
+    if args.auto_subdir_by_features_key:
+        # Make per-tap runs easy: --features-key features_hs-1_image -> output_dir/features_hs-1_image/summary.json
+        safe = "".join(ch if (ch.isalnum() or ch in "._-") else "_" for ch in str(args.features_key))
+        out_dir = out_dir / safe
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    t0 = time.perf_counter()
     samples = load_jsonl(
         args.data,
         image_key=args.image_key,
@@ -177,11 +194,18 @@ def main() -> None:
     )
     if not samples:
         raise SystemExit("No valid samples loaded from JSONL")
+    if args.verbose:
+        print(f"[data] loaded n={len(samples)} from {args.data}")
+        print(f"[data] image_key={args.image_key} label_key={args.label_key} sample_id_key={args.sample_id_key or '(default)'}")
 
     labels = np.asarray([s.label for s in samples], dtype=object)
     y_all, classes = encode_labels(labels)
+    if args.verbose:
+        print(f"[data] num_classes={len(classes)} classes_sample={classes[: min(10, len(classes))].tolist()}")
 
     plugin_kwargs = json.loads(args.plugin_kwargs)
+    if args.verbose and args.extractor == "npz":
+        print(f"[npz] path={args.features_npz} features_key={args.features_key} ids_key={args.ids_key}")
     extractor = build_extractor(
         args.extractor,
         image_root=args.image_root or None,
@@ -191,27 +215,42 @@ def main() -> None:
         plugin_kwargs=plugin_kwargs,
     )
 
+    t1 = time.perf_counter()
     x_all = np.asarray(extractor.extract(samples), dtype=np.float32)
+    t2 = time.perf_counter()
     if x_all.ndim != 2:
         raise ValueError(f"Expected 2D features [N, D], got {x_all.shape}")
     if x_all.shape[0] != len(samples):
         raise ValueError(f"Feature/sample size mismatch: features={x_all.shape[0]} samples={len(samples)}")
+    if args.verbose:
+        print(f"[feat] shape={tuple(x_all.shape)} dtype={x_all.dtype}")
+        print(f"[time] load_jsonl={t1-t0:.3f}s extract_features={t2-t1:.3f}s")
 
     summary = {
         "data": args.data,
         "n_samples": len(samples),
         "feature_shape": list(x_all.shape),
         "extractor": args.extractor,
+        "features_npz": args.features_npz if args.extractor == "npz" else None,
+        "features_key": args.features_key if args.extractor == "npz" else None,
+        "ids_key": args.ids_key if args.extractor == "npz" else None,
         "group_by_candidate_labels": bool(args.group_by_candidate_labels),
     }
 
     if not args.group_by_candidate_labels:
+        if args.verbose:
+            print("[group] disabled (single run)")
         summary.update(run_single_eval(x_all=x_all, y_all=y_all, classes=classes, args=args))
     else:
         schemas = [candidate_schema(s.raw, args.candidate_labels_key) for s in samples]
         group_to_idx: dict[str, list[int]] = {}
         for i, g in enumerate(schemas):
             group_to_idx.setdefault(g, []).append(i)
+        if args.verbose:
+            sizes = sorted(((k, len(v)) for k, v in group_to_idx.items()), key=lambda kv: (-kv[1], kv[0]))
+            print(f"[group] enabled key={args.candidate_labels_key} num_groups={len(sizes)} min_group_size={args.min_group_size}")
+            for k, v in sizes[:10]:
+                print(f"[group] top size={v} schema={k}")
 
         group_summaries = []
         skipped = []
@@ -225,6 +264,8 @@ def main() -> None:
                 skipped.append({"group": g, "size": len(idxs), "reason": "single_class"})
                 continue
             sub_x = x_all[idxs]
+            if args.verbose:
+                print(f"[group] running schema={g} n={len(idxs)} n_classes={len(sub_classes)}")
             res = run_single_eval(x_all=sub_x, y_all=sub_y, classes=sub_classes, args=args)
             res["group"] = g
             res["n_samples"] = len(idxs)
@@ -232,8 +273,11 @@ def main() -> None:
 
         summary["groups"] = group_summaries
         summary["group_skipped"] = skipped
+        if args.verbose and skipped:
+            print(f"[group] skipped={len(skipped)} (see summary.json for details)")
 
-    (out_dir / "summary.json").write_text(json.dumps(json_ready(summary), ensure_ascii=False, indent=2), encoding="utf-8")
+    summary_path = out_dir / args.summary_filename
+    summary_path.write_text(json.dumps(json_ready(summary), ensure_ascii=False, indent=2), encoding="utf-8")
 
     if args.save_features:
         np.savez_compressed(
@@ -243,7 +287,10 @@ def main() -> None:
             ids=np.asarray([s.sample_id for s in samples], dtype=str),
         )
 
-    print(json.dumps({"output_dir": str(out_dir), "summary": str(out_dir / 'summary.json')}, ensure_ascii=False))
+    t3 = time.perf_counter()
+    if args.verbose:
+        print(f"[time] total={t3-t0:.3f}s")
+    print(json.dumps({"output_dir": str(out_dir), "summary": str(summary_path)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

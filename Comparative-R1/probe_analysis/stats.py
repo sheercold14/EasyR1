@@ -39,6 +39,8 @@ def bootstrap_ci(
     n_bootstrap: int = 1000,
     seed: int = 42,
 ) -> dict[str, dict[str, float]]:
+    if n_bootstrap <= 0:
+        return {}
     rng = np.random.default_rng(seed)
     n = len(y_true)
     if n == 0:

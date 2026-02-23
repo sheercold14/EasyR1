@@ -12,7 +12,10 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from probe_analysis.datasets import load_jsonl
-from probe_analysis.hf_extractors import build_qwen2vl_visual_mean_extractor
+from probe_analysis.hf_extractors import (
+    build_qwen2vl_hidden_state_mean_extractor,
+    build_qwen2vl_visual_mean_extractor,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,6 +33,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--device", default="auto", help="transformers device_map, e.g. auto/cuda:0/cpu")
     p.add_argument("--trust-remote-code", action="store_true")
     p.add_argument("--prompt-text", default="Describe the image briefly.")
+    p.add_argument(
+        "--tap",
+        default="vision_mean",
+        choices=["vision_mean", "hidden_mean"],
+        help="Where to extract features: vision_mean (visual tower) or hidden_mean (LLM hidden_states).",
+    )
+    p.add_argument("--layer", type=int, default=0, help="hidden_mean only: hidden_states layer index (0=embed).")
+    p.add_argument(
+        "--token-scope",
+        default="image",
+        choices=["image", "text", "all"],
+        help="hidden_mean only: which tokens to pool (image/text/all).",
+    )
     return p.parse_args()
 
 
@@ -53,6 +69,18 @@ def main() -> None:
         trust_remote_code=args.trust_remote_code,
         prompt_text=args.prompt_text,
     )
+    if args.tap == "hidden_mean":
+        extractor = build_qwen2vl_hidden_state_mean_extractor(
+            image_root=args.image_root or None,
+            checkpoint=args.checkpoint,
+            processor_path=args.processor_path or None,
+            dtype=args.dtype,
+            device=args.device,
+            trust_remote_code=args.trust_remote_code,
+            prompt_text=args.prompt_text,
+            layer=args.layer,
+            token_scope=args.token_scope,
+        )
     feats = extractor.extract(samples)
 
     ids = np.asarray([s.sample_id for s in samples], dtype=str)
@@ -70,6 +98,9 @@ def main() -> None:
                 "num_samples": int(len(samples)),
                 "feature_dim": int(feats.shape[1]),
                 "checkpoint": args.checkpoint,
+                "tap": args.tap,
+                "layer": args.layer if args.tap == "hidden_mean" else None,
+                "token_scope": args.token_scope if args.tap == "hidden_mean" else None,
             },
             ensure_ascii=False,
         )

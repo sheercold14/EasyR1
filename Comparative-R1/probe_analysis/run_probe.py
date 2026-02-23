@@ -41,6 +41,8 @@ def parse_args() -> argparse.Namespace:
 
     p.add_argument("--bootstrap", type=int, default=1000, help="bootstrap rounds for 95% CI")
     p.add_argument("--save-features", action="store_true")
+    p.add_argument("--verbose", action="store_true", help="Print probe training/eval progress.")
+    p.add_argument("--log-every", type=int, default=100, help="Log interval (steps) for linear/mlp probes.")
     p.add_argument(
         "--group-by-candidate-labels",
         action="store_true",
@@ -103,13 +105,33 @@ def run_single_eval(
     x_test, y_test = x_all[test_idx], y_all[test_idx]
 
     probe_names = {x.strip() for x in args.probes.split(",") if x.strip()}
+    if args.verbose:
+        print(
+            f"[probe] split train={len(train_idx)} test={len(test_idx)} classes={len(classes)} probes={sorted(probe_names)}"
+        )
     outputs = []
     if "linear" in probe_names:
-        outputs.append(run_linear_probe(x_train, y_train, x_test, seed=args.seed))
+        if args.verbose:
+            print("[probe] training linear")
+        outputs.append(run_linear_probe(x_train, y_train, x_test, seed=args.seed, verbose=args.verbose, log_every=args.log_every))
     if "knn" in probe_names:
-        outputs.append(run_knn_probe(x_train, y_train, x_test, k=args.knn_k))
+        if args.verbose:
+            print("[probe] running knn")
+        outputs.append(run_knn_probe(x_train, y_train, x_test, k=args.knn_k, verbose=args.verbose))
     if "mlp" in probe_names:
-        outputs.append(run_mlp_probe(x_train, y_train, x_test, seed=args.seed, hidden_dim=args.mlp_hidden))
+        if args.verbose:
+            print("[probe] training mlp")
+        outputs.append(
+            run_mlp_probe(
+                x_train,
+                y_train,
+                x_test,
+                seed=args.seed,
+                hidden_dim=args.mlp_hidden,
+                verbose=args.verbose,
+                log_every=args.log_every,
+            )
+        )
     if not outputs:
         raise ValueError("No valid probes selected")
 
@@ -117,6 +139,10 @@ def run_single_eval(
     for out in outputs:
         m = compute_metrics(y_test, out.y_pred)
         ci = bootstrap_ci(y_test, out.y_pred, n_bootstrap=args.bootstrap, seed=args.seed)
+        if args.verbose:
+            print(
+                f"[probe-metrics] {out.name} acc={m['accuracy']:.4f} bal_acc={m['balanced_accuracy']:.4f} macro_f1={m['macro_f1']:.4f}"
+            )
         results.append(
             {
                 "probe": out.name,
@@ -215,8 +241,6 @@ def main() -> None:
             features=x_all,
             labels=labels,
             ids=np.asarray([s.sample_id for s in samples], dtype=str),
-            train_idx=train_idx,
-            test_idx=test_idx,
         )
 
     print(json.dumps({"output_dir": str(out_dir), "summary": str(out_dir / 'summary.json')}, ensure_ascii=False))
